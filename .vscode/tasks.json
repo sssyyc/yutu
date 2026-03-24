@@ -1,0 +1,32 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "backend:run",
+      "type": "shell",
+      "command": "mvn spring-boot:run",
+      "options": {
+        "cwd": "${workspaceFolder}/yutu-admin"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "backend:package",
+      "type": "shell",
+      "command": "mvn clean package -DskipTests",
+      "options": {
+        "cwd": "${workspaceFolder}/yutu-admin"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "web:dev",
+      "type": "shell",
+      "command": "npm run dev",
+      "options": {
+        "cwd": "${workspaceFolder}/yutu-web"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

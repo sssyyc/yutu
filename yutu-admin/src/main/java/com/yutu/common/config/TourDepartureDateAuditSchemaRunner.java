@@ -1,0 +1,43 @@
+package com.yutu.common.config;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Component;
+
+@Component
+public class TourDepartureDateAuditSchemaRunner implements ApplicationRunner {
+    private static final Logger log = LoggerFactory.getLogger(TourDepartureDateAuditSchemaRunner.class);
+    private static final String COLUMN_EXISTS_SQL =
+            "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?";
+    private static final String TABLE_NAME = "tour_departure_date";
+
+    private final JdbcTemplate jdbcTemplate;
+
+    public TourDepartureDateAuditSchemaRunner(JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }
+
+    @Override
+    public void run(ApplicationArguments args) {
+        ensureColumn("audit_status",
+                "ALTER TABLE tour_departure_date ADD COLUMN audit_status TINYINT NOT NULL DEFAULT 1 COMMENT '0待审核 1通过 2驳回' AFTER status");
+        ensureColumn("audit_remark",
+                "ALTER TABLE tour_departure_date ADD COLUMN audit_remark VARCHAR(255) NULL AFTER audit_status");
+    }
+
+    private void ensureColumn(String columnName, String alterSql) {
+        try {
+            Integer columnCount = jdbcTemplate.queryForObject(COLUMN_EXISTS_SQL, Integer.class, TABLE_NAME, columnName);
+            if (columnCount != null && columnCount > 0) {
+                return;
+            }
+            jdbcTemplate.execute(alterSql);
+            log.info("Added column {}.{} successfully", TABLE_NAME, columnName);
+        } catch (Exception ex) {
+            log.warn("Failed to ensure column {}.{} exists", TABLE_NAME, columnName, ex);
+        }
+    }
+}

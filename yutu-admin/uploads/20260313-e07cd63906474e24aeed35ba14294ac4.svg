@@ -1,0 +1,68 @@
+<svg width="1600" height="900" viewBox="0 0 1600 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="900" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0E4D64"/>
+      <stop offset="0.52" stop-color="#1D6F7F"/>
+      <stop offset="1" stop-color="#E7D7BC"/>
+    </linearGradient>
+    <linearGradient id="sunGlow" x1="1170" y1="88" x2="1170" y2="352" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFE9A6" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="#FFE9A6" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="mist" x1="0" y1="560" x2="1600" y2="560" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#EADFCB" stop-opacity="0.3"/>
+      <stop offset="0.5" stop-color="#FFF2D8" stop-opacity="0.6"/>
+      <stop offset="1" stop-color="#EADFCB" stop-opacity="0.2"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#sky)"/>
+  <circle cx="1170" cy="220" r="190" fill="url(#sunGlow)"/>
+  <circle cx="1146" cy="206" r="72" fill="#F8D68B" fill-opacity="0.92"/>
+
+  <g opacity="0.75" fill="#CDE5E8">
+    <ellipse cx="265" cy="168" rx="96" ry="22"/>
+    <ellipse cx="345" cy="176" rx="78" ry="18"/>
+    <ellipse cx="930" cy="145" rx="92" ry="20"/>
+    <ellipse cx="1000" cy="151" rx="68" ry="16"/>
+    <ellipse cx="1300" cy="120" rx="112" ry="23"/>
+    <ellipse cx="1385" cy="127" rx="78" ry="18"/>
+  </g>
+
+  <path d="M0 495C121 431 232 422 342 444C421 460 485 493 564 494C648 495 704 456 792 442C902 424 971 470 1058 500C1120 521 1194 529 1274 504C1401 464 1500 460 1600 490V900H0V495Z" fill="#375C63"/>
+  <path d="M0 560C129 507 224 500 328 521C412 538 472 576 566 576C650 576 710 533 792 520C884 505 962 529 1049 563C1148 602 1249 608 1341 578C1430 549 1510 543 1600 565V900H0V560Z" fill="#4E716D"/>
+  <path d="M0 621C174 584 285 580 398 607C501 631 590 685 706 684C821 683 882 620 994 605C1110 590 1220 640 1326 670C1419 696 1505 698 1600 676V900H0V621Z" fill="#6E8D7F"/>
+
+  <path d="M0 665C102 650 206 654 305 679C411 705 499 758 605 775C741 797 866 776 989 734C1074 704 1141 696 1223 712C1327 732 1425 787 1600 810V900H0V665Z" fill="#D9C4A6"/>
+  <path d="M0 730C107 707 214 711 315 742C443 781 555 848 723 858C907 869 1012 796 1161 775C1317 752 1421 789 1600 854V900H0V730Z" fill="#EFE3CD"/>
+
+  <path d="M967 700C1076 657 1170 640 1260 646C1342 651 1419 676 1512 733C1551 756 1579 781 1600 806V900H855C886 824 920 758 967 700Z" fill="#A6C5C7"/>
+  <path d="M934 744C1051 703 1145 691 1226 702C1302 713 1381 745 1466 803C1494 823 1521 849 1543 900H903C909 847 918 793 934 744Z" fill="#D7ECEF"/>
+
+  <path d="M1263 900C1275 828 1294 760 1324 699C1345 655 1371 620 1403 591C1419 576 1437 561 1457 549C1477 537 1498 530 1520 530C1541 530 1561 536 1579 547C1587 552 1594 557 1600 563V900H1263Z" fill="#D24E38"/>
+  <path d="M1387 900V679H1452V900H1387Z" fill="#F2D5A2"/>
+  <rect x="1372" y="713" width="95" height="17" rx="8.5" fill="#F2D5A2"/>
+  <rect x="1364" y="760" width="112" height="17" rx="8.5" fill="#F2D5A2"/>
+  <rect x="1356" y="810" width="128" height="17" rx="8.5" fill="#F2D5A2"/>
+  <path d="M1361 678L1419 610L1478 678H1361Z" fill="#B63A28"/>
+  <path d="M1394 610H1446L1420 567L1394 610Z" fill="#A52C20"/>
+
+  <g fill="#203A43">
+    <rect x="226" y="602" width="20" height="116" rx="10"/>
+    <rect x="275" y="564" width="20" height="154" rx="10"/>
+    <rect x="326" y="590" width="20" height="128" rx="10"/>
+    <rect x="376" y="540" width="20" height="178" rx="10"/>
+    <rect x="430" y="615" width="20" height="103" rx="10"/>
+    <rect x="477" y="575" width="20" height="143" rx="10"/>
+    <rect x="533" y="628" width="20" height="90" rx="10"/>
+  </g>
+
+  <path d="M828 665C861 625 899 607 943 607C987 607 1024 626 1057 665C1027 707 989 741 943 768C897 741 859 707 828 665Z" fill="#F6F3E8"/>
+  <path d="M871 665C871 625 902 594 943 594C983 594 1015 625 1015 665C1015 705 983 736 943 736C902 736 871 705 871 665Z" fill="#E06B51"/>
+  <circle cx="943" cy="665" r="24" fill="#F6F3E8"/>
+
+  <path d="M412 781C529 715 608 683 675 680C734 677 792 700 862 741" stroke="#9B6A41" stroke-width="20" stroke-linecap="round"/>
+  <path d="M410 781C456 775 506 783 553 806C598 828 638 859 685 877" stroke="#F8F3E6" stroke-width="8" stroke-linecap="round" stroke-dasharray="2 24"/>
+
+  <path d="M0 616C258 604 524 614 808 635C1102 656 1367 689 1600 736" stroke="url(#mist)" stroke-width="38" stroke-linecap="round"/>
+</svg>

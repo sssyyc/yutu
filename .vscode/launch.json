@@ -1,0 +1,14 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "name": "Run YutuApplication",
+      "request": "launch",
+      "mainClass": "com.yutu.YutuApplication",
+      "projectName": "yutu-admin",
+      "cwd": "${workspaceFolder}/yutu-admin",
+      "vmArgs": "-Dfile.encoding=UTF-8"
+    }
+  ]
+}

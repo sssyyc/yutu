@@ -1,0 +1,27 @@
+﻿const { chromium } = require('playwright-core');
+(async () => {
+  const browser = await chromium.launch({ headless: true, executablePath: 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe' });
+  const page = await browser.newPage();
+  await page.goto('http://127.0.0.1:5174/login', { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(1000);
+  await page.locator('input').nth(0).fill('merchant01');
+  await page.locator('input').nth(1).fill('123456');
+  await page.locator('button:has-text("登录系统")').click();
+  await page.waitForTimeout(2500);
+  const snapshots = [];
+  snapshots.push('after_login=' + page.url());
+  await page.locator('text=用户端').click();
+  await page.waitForTimeout(1200);
+  snapshots.push('after_user_click=' + page.url());
+  await page.goto('http://127.0.0.1:5174/merchant', { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(1200);
+  await page.locator('text=路线管理').click();
+  await page.waitForTimeout(1200);
+  snapshots.push('after_route_click=' + page.url());
+  const body = await page.locator('body').innerText();
+  console.log(snapshots.join('\n'));
+  console.log('BODY_SLICE_START');
+  console.log(body.slice(0, 1200));
+  console.log('BODY_SLICE_END');
+  await browser.close();
+})();

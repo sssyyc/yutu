@@ -1,0 +1,7 @@
+*.log
+.DS_Store
+
+yutu-web/node_modules/
+yutu-web/dist/
+
+yutu-admin/target/
