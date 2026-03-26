@@ -1,7 +1,16 @@
 *.log
 .DS_Store
 
+.runtime/
+.tmp-playwright/
+.edge*/
+.vscode/
+yutu.code-workspace
+
 yutu-web/node_modules/
 yutu-web/dist/
 
 yutu-admin/target/
+yutu-web/*.log
+yutu-admin/*.log
+mysql-*.log

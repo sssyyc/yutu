@@ -6,27 +6,21 @@
         <h1>{{ data.contract.contractTitle }}</h1>
         <div class="meta-row">
           <span>合同号 {{ data.contract.contractNo }}</span>
-          <span>{{ data.contract.signStatus === "SIGNED" ? "已签署" : "待签署" }}</span>
-          <span v-if="data.contract.signTime">签署时间 {{ formatDateTime(data.contract.signTime) }}</span>
+          <span>{{ signStatusText }}</span>
+          <span>已签 {{ signedCount }}/{{ requiredSignCount || 0 }}</span>
+          <span v-if="lastSignatureTime">最近签署 {{ formatDateTime(lastSignatureTime) }}</span>
         </div>
         <div class="hero-actions">
           <el-button type="primary" @click="downloadContract">下载合同</el-button>
           <el-button v-if="canSign" type="success" plain @click="scrollToSignature">前往签署</el-button>
-          <el-button
-            v-else-if="data.contract?.orderId"
-            type="warning"
-            plain
-            @click="goToPayment"
-          >
-            前往支付
-          </el-button>
+          <el-button v-else-if="canPay" type="warning" plain @click="goToPayment">前往支付</el-button>
         </div>
       </div>
       <div class="hero-status">
-        <div class="status-pill" :class="{ signed: !canSign }">
-          {{ canSign ? "等待电子签名" : "签署完成" }}
+        <div class="status-pill" :class="{ signed: allSigned }">
+          {{ signStatusText }}
         </div>
-        <p>{{ canSign ? "阅读合同正文后，在下方签名板完成电子签名。" : "当前合同已经签署完成，可下载留存。" }}</p>
+        <p>{{ heroStatusMessage }}</p>
       </div>
     </section>
 
@@ -46,19 +40,27 @@
       <aside class="summary-card">
         <div class="summary-item">
           <span>签署状态</span>
-          <strong>{{ data.contract.signStatus === "SIGNED" ? "已签署" : "待签署" }}</strong>
+          <strong>{{ signStatusText }}</strong>
         </div>
         <div class="summary-item">
-          <span>合同编号</span>
-          <strong>{{ data.contract.contractNo }}</strong>
+          <span>签署进度</span>
+          <strong>{{ signedCount }}/{{ requiredSignCount || 0 }}</strong>
         </div>
         <div class="summary-item">
-          <span>签署人</span>
-          <strong>{{ signerDisplayName }}</strong>
+          <span>待签署人</span>
+          <strong>{{ pendingTravelerNamesDisplay }}</strong>
         </div>
         <div class="summary-item">
-          <span>签署时间</span>
-          <strong>{{ data.contract.signTime ? formatDateTime(data.contract.signTime) : "待签署" }}</strong>
+          <span>已签署人</span>
+          <strong>{{ signedTravelerNamesDisplay }}</strong>
+        </div>
+        <div class="summary-item">
+          <span>订单出行人</span>
+          <strong>{{ travelerNamesDisplay }}</strong>
+        </div>
+        <div class="summary-item">
+          <span>最近签署时间</span>
+          <strong>{{ lastSignatureTime ? formatDateTime(lastSignatureTime) : "暂无" }}</strong>
         </div>
       </aside>
     </section>
@@ -80,17 +82,64 @@
     <section ref="signatureSectionRef" class="page-card signature-card">
       <div class="section-head">
         <h3>电子签名</h3>
-        <span>{{ canSign ? "签名后将完成本合同确认" : "已保存电子签名" }}</span>
+        <span>{{ signatureSectionCaption }}</span>
       </div>
 
-      <template v-if="canSign">
-        <div class="signer-form">
-          <label>签署人</label>
-          <el-input v-model="signForm.signerName" maxlength="64" placeholder="请输入签署人姓名" />
+      <div class="progress-strip">
+        <div class="progress-copy">
+          <strong>{{ signStatusText }}</strong>
+          <p>{{ progressHint }}</p>
         </div>
-        <p class="signature-hint">
-          请在签名板中完成手写电子签名。提交后，系统会记录签署时间并更新合同状态。
-        </p>
+        <div class="progress-count">{{ signedCount }}/{{ requiredSignCount || 0 }}</div>
+      </div>
+
+      <div v-if="travelers.length" class="traveler-status-list">
+        <div
+          v-for="(traveler, index) in travelers"
+          :key="traveler.id || index"
+          class="traveler-status-item"
+          :class="{ done: isTravelerSigned(traveler.id) }"
+        >
+          <div class="traveler-status-main">
+            <strong>{{ travelerOptionLabel(traveler, index) }}</strong>
+            <p>{{ travelerStatusMeta(traveler) }}</p>
+          </div>
+          <div class="traveler-status-side">
+            <el-tag :type="isTravelerSigned(traveler.id) ? 'success' : 'warning'" effect="light">
+              {{ isTravelerSigned(traveler.id) ? "已签署" : "待签署" }}
+            </el-tag>
+            <span v-if="travelerSignatureTime(traveler.id)">
+              {{ formatDateTime(travelerSignatureTime(traveler.id)) }}
+            </span>
+          </div>
+        </div>
+      </div>
+      <el-empty v-else description="当前订单暂无出行人信息，暂时无法签署合同" />
+
+      <template v-if="canSign">
+        <div class="signer-form-row">
+          <div class="signer-form">
+            <label>本次签署人</label>
+            <el-select
+              v-model="signForm.travelerId"
+              placeholder="请选择待签署的出行人"
+            >
+              <el-option
+                v-for="(traveler, index) in pendingTravelers"
+                :key="traveler.id"
+                :label="travelerOptionLabel(traveler, index)"
+                :value="traveler.id"
+              />
+            </el-select>
+          </div>
+          <div class="signer-preview">
+            <span>签署姓名</span>
+            <strong>{{ currentSignerName || "请选择出行人" }}</strong>
+          </div>
+        </div>
+
+        <p class="signature-hint">{{ signatureHint }}</p>
+
         <div class="signature-board">
           <canvas
             ref="signatureCanvasRef"
@@ -101,48 +150,59 @@
             @pointerleave="endDraw"
           />
         </div>
+
         <div class="signature-actions">
           <el-button @click="clearSignature">清除签名</el-button>
-          <el-button type="primary" :loading="signing" @click="submitSignature">确认签署</el-button>
+          <el-button
+            type="primary"
+            :loading="signing"
+            :disabled="!currentSignerName"
+            @click="submitSignature"
+          >
+            确认签署
+          </el-button>
         </div>
       </template>
 
-      <template v-else>
-        <div class="signed-panel">
-          <div class="signed-meta">
-            <div>
-              <span>签署人</span>
-              <strong>{{ signatureName }}</strong>
-            </div>
-            <div>
-              <span>签署时间</span>
-              <strong>{{ data.contract?.signTime ? formatDateTime(data.contract.signTime) : "已签署" }}</strong>
-            </div>
-          </div>
-          <div class="signature-preview">
-            <img
-              v-if="data.signature?.signatureImage"
-              :src="data.signature.signatureImage"
-              alt="电子签名"
-            />
-            <div v-else class="signature-fallback">{{ signatureName }}</div>
-          </div>
+      <div v-else-if="allSigned" class="signed-complete">
+        <strong>全部出行人已完成电子签名</strong>
+        <p>合同确认已经完成，当前可以下载留存，若订单待支付可继续前往支付。</p>
+      </div>
+
+      <div v-if="signatures.length" class="record-section">
+        <div class="section-subhead">
+          <h4>签署记录</h4>
+          <span>{{ signatures.length }} 份</span>
         </div>
-      </template>
+        <div class="record-grid">
+          <article v-for="(item, index) in signatures" :key="item.id || index" class="record-card">
+            <div class="record-head">
+              <strong>{{ item.signerName || `签署人 ${index + 1}` }}</strong>
+              <span>{{ item.signTime ? formatDateTime(item.signTime) : "已签署" }}</span>
+            </div>
+            <div class="record-preview">
+              <img
+                v-if="item.signatureImage"
+                :src="item.signatureImage"
+                :alt="`${item.signerName || '签署人'}电子签名`"
+              />
+              <div v-else class="record-fallback">{{ item.signerName || "电子签名" }}</div>
+            </div>
+          </article>
+        </div>
+      </div>
     </section>
   </div>
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, reactive, ref } from "vue";
+import { computed, nextTick, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import { api } from "../../api";
-import { useAuthStore } from "../../stores/auth";
 
 const route = useRoute();
 const router = useRouter();
-const auth = useAuthStore();
 const data = ref({});
 const signing = ref(false);
 const signatureCanvasRef = ref(null);
@@ -152,12 +212,82 @@ const hasSignatureStroke = ref(false);
 let context2d = null;
 
 const signForm = reactive({
-  signerName: ""
+  travelerId: null
 });
 
-const canSign = computed(() => data.value.contract?.signStatus !== "SIGNED");
-const signerDisplayName = computed(() => data.value.signerDisplayName || auth.user?.nickname || auth.user?.username || "游客");
-const signatureName = computed(() => data.value.signature?.signerName || signerDisplayName.value);
+const travelers = computed(() => sanitizeTravelers(data.value.travelers));
+const signatures = computed(() => (
+  Array.isArray(data.value.signatures) ? data.value.signatures.filter(Boolean) : []
+));
+const travelerNameCounts = computed(() => {
+  const counts = new Map();
+  travelers.value.forEach((traveler) => {
+    const key = normalizeName(traveler.travelerName);
+    if (!key) return;
+    counts.set(key, (counts.get(key) || 0) + 1);
+  });
+  return counts;
+});
+const signatureByTravelerKey = computed(() => {
+  const map = new Map();
+  signatures.value.forEach((item) => {
+    const key = normalizeId(item?.travelerId);
+    if (!key || map.has(key)) return;
+    map.set(key, item);
+  });
+  return map;
+});
+const signedTravelerKeys = computed(() => {
+  const keys = new Set();
+  const rawIds = Array.isArray(data.value.signedTravelerIds) ? data.value.signedTravelerIds : [];
+  rawIds.forEach((item) => {
+    const key = normalizeId(item);
+    if (key) {
+      keys.add(key);
+    }
+  });
+  if (keys.size) {
+    return keys;
+  }
+  travelers.value.forEach((traveler) => {
+    if (findSignatureForTraveler(traveler)) {
+      keys.add(normalizeId(traveler.id));
+    }
+  });
+  return keys;
+});
+const signedTravelerNames = computed(() => {
+  const serverNames = Array.isArray(data.value.signedTravelerNames) ? data.value.signedTravelerNames : [];
+  const normalized = [...new Set(serverNames.map(normalizeName).filter(Boolean))];
+  if (normalized.length) {
+    return normalized;
+  }
+  return travelers.value
+    .filter((traveler) => isTravelerSigned(traveler.id))
+    .map((traveler) => normalizeName(traveler.travelerName))
+    .filter(Boolean);
+});
+const requiredSignCount = computed(() => resolveCount(data.value.requiredSignCount, travelers.value.length));
+const signedCount = computed(() => resolveCount(data.value.signedCount, signedTravelerKeys.value.size));
+const pendingTravelers = computed(() => {
+  const serverTravelers = sanitizeTravelers(data.value.pendingTravelers);
+  if (serverTravelers.length || requiredSignCount.value === 0) {
+    return serverTravelers;
+  }
+  return travelers.value.filter((traveler) => !isTravelerSigned(traveler.id));
+});
+const pendingSignCount = computed(() => (
+  resolveCount(data.value.pendingSignCount, Math.max(requiredSignCount.value - signedCount.value, 0))
+));
+const allSigned = computed(() => (
+  Boolean(data.value.allSigned) || (requiredSignCount.value > 0 && pendingSignCount.value === 0)
+));
+const canSign = computed(() => requiredSignCount.value > 0 && pendingTravelers.value.length > 0);
+const canPay = computed(() => allSigned.value && Boolean(data.value.contract?.orderId));
+const currentTraveler = computed(() => (
+  pendingTravelers.value.find((item) => normalizeId(item.id) === normalizeId(signForm.travelerId)) || null
+));
+const currentSignerName = computed(() => normalizeName(currentTraveler.value?.travelerName));
 const contractParagraphs = computed(() => {
   const content = data.value.contract?.contractContent || "";
   return content
@@ -165,17 +295,94 @@ const contractParagraphs = computed(() => {
     .map((item) => item.trim())
     .filter(Boolean);
 });
+const travelerNamesDisplay = computed(() => {
+  const names = travelers.value.map((traveler) => normalizeName(traveler.travelerName)).filter(Boolean);
+  return names.length ? names.join("、") : "暂无出行人";
+});
+const signedTravelerNamesDisplay = computed(() => (
+  signedTravelerNames.value.length ? signedTravelerNames.value.join("、") : "暂无"
+));
+const pendingTravelerNamesDisplay = computed(() => {
+  const names = pendingTravelers.value
+    .map((traveler) => normalizeName(traveler.travelerName))
+    .filter(Boolean);
+  if (!requiredSignCount.value) {
+    return "暂无出行人";
+  }
+  return names.length ? names.join("、") : "全部完成";
+});
+const lastSignatureTime = computed(() => {
+  const latestSignature = signatures.value[signatures.value.length - 1];
+  return latestSignature?.signTime || data.value.contract?.signTime || null;
+});
+const signStatusText = computed(() => {
+  if (!requiredSignCount.value) {
+    return "缺少出行人信息";
+  }
+  if (allSigned.value) {
+    return "已签署";
+  }
+  if (signedCount.value > 0) {
+    return "待补签";
+  }
+  return "待签署";
+});
+const heroStatusMessage = computed(() => {
+  if (!requiredSignCount.value) {
+    return "当前订单缺少有效的出行人信息，暂时无法完成电子签署。";
+  }
+  if (allSigned.value) {
+    return canPay.value
+      ? "当前合同已完成全部电子签名，可以继续前往支付。"
+      : "当前合同已完成全部电子签名，可下载留存。";
+  }
+  return `订单共有 ${requiredSignCount.value} 位出行人，需全部完成签名后才算合同确认，当前还差 ${pendingSignCount.value} 个签名。`;
+});
+const signatureSectionCaption = computed(() => {
+  if (!requiredSignCount.value) {
+    return "缺少出行人信息";
+  }
+  if (allSigned.value) {
+    return "已完成全部电子签名";
+  }
+  return `还需 ${pendingSignCount.value} 个签名`;
+});
+const progressHint = computed(() => {
+  if (!requiredSignCount.value) {
+    return "请先补全订单中的出行人信息，再进行合同签署。";
+  }
+  if (allSigned.value) {
+    return `共 ${requiredSignCount.value} 位出行人，均已完成电子签名。`;
+  }
+  return `当前已完成 ${signedCount.value} 个签名，剩余 ${pendingSignCount.value} 位出行人待签署。`;
+});
+const signatureHint = computed(() => {
+  if (!currentSignerName.value) {
+    return "请选择本次需要签署的出行人，然后在下方签名板中完成手写电子签名。";
+  }
+  return `订单中的每位出行人都需要各自签名。本次将以“${currentSignerName.value}”的实际姓名提交签名，提交后会自动更新剩余待签名单。`;
+});
 
 async function load() {
   data.value = await api.get(`/contracts/${route.params.id}`);
-  signForm.signerName = signerDisplayName.value;
+  syncSelectedTraveler();
   await nextTick();
   if (canSign.value) {
     initCanvas();
     if (route.query.action === "sign") {
       scrollToSignature();
     }
+    return;
   }
+  resetCanvasState();
+}
+
+function syncSelectedTraveler() {
+  const currentKey = normalizeId(signForm.travelerId);
+  if (currentKey && pendingTravelers.value.some((traveler) => normalizeId(traveler.id) === currentKey)) {
+    return;
+  }
+  signForm.travelerId = pendingTravelers.value[0]?.id ?? null;
 }
 
 function initCanvas() {
@@ -194,6 +401,14 @@ function initCanvas() {
   context2d.strokeStyle = "#17324f";
   context2d.fillStyle = "#ffffff";
   context2d.fillRect(0, 0, width, height);
+  hasSignatureStroke.value = false;
+  isDrawing.value = false;
+}
+
+function resetCanvasState() {
+  context2d = null;
+  hasSignatureStroke.value = false;
+  isDrawing.value = false;
 }
 
 function pointInCanvas(event) {
@@ -228,7 +443,10 @@ function endDraw() {
 }
 
 function clearSignature() {
-  hasSignatureStroke.value = false;
+  if (!canSign.value) {
+    resetCanvasState();
+    return;
+  }
   initCanvas();
 }
 
@@ -255,26 +473,38 @@ async function downloadContract() {
 }
 
 async function submitSignature() {
-  if (!signForm.signerName.trim()) {
-    ElMessage.warning("请填写签署人");
+  if (!requiredSignCount.value) {
+    ElMessage.warning("当前订单缺少出行人信息，暂时无法签署");
+    return;
+  }
+  if (!currentTraveler.value || !currentSignerName.value) {
+    ElMessage.warning("请选择待签署的出行人");
     return;
   }
   if (!hasSignatureStroke.value || !signatureCanvasRef.value) {
     ElMessage.warning("请先完成电子签名");
     return;
   }
+
   signing.value = true;
   try {
     await api.post(`/contracts/${route.params.id}/sign`, {
-      signerName: signForm.signerName.trim(),
+      travelerId: currentTraveler.value.id,
+      signerName: currentSignerName.value,
       signatureImage: signatureCanvasRef.value.toDataURL("image/png")
     });
-    ElMessage.success("合同签署成功");
-    if (data.value.contract?.orderId) {
-      router.replace(`/order/pay/${data.value.contract.orderId}`);
+
+    await load();
+
+    if (allSigned.value) {
+      ElMessage.success("全部出行人已完成合同签署");
+      if (data.value.contract?.orderId) {
+        router.replace(`/order/pay/${data.value.contract.orderId}`);
+      }
       return;
     }
-    await load();
+
+    ElMessage.success(`已完成签署，当前进度 ${signedCount.value}/${requiredSignCount.value}`);
   } finally {
     signing.value = false;
   }
@@ -289,6 +519,87 @@ function formatDateTime(value) {
   if (!value) return "-";
   return String(value).replace("T", " ").slice(0, 19);
 }
+
+function isTravelerSigned(travelerId) {
+  return signedTravelerKeys.value.has(normalizeId(travelerId));
+}
+
+function travelerSignatureTime(travelerId) {
+  const traveler = travelers.value.find((item) => normalizeId(item.id) === normalizeId(travelerId));
+  return findSignatureForTraveler(traveler)?.signTime || null;
+}
+
+function travelerOptionLabel(traveler, index) {
+  const name = normalizeName(traveler?.travelerName) || `出行人 ${index + 1}`;
+  const duplicateCount = travelerNameCounts.value.get(normalizeName(traveler?.travelerName)) || 0;
+  if (duplicateCount <= 1) {
+    return name;
+  }
+  if (traveler?.idCard) {
+    return `${name}（身份证后4位 ${String(traveler.idCard).slice(-4)}）`;
+  }
+  return `${name}（出行人 ${index + 1}）`;
+}
+
+function travelerStatusMeta(traveler) {
+  const parts = [];
+  if (traveler?.idCard) {
+    parts.push(`身份证号：${traveler.idCard}`);
+  }
+  if (traveler?.phone) {
+    parts.push(`手机号：${traveler.phone}`);
+  }
+  return parts.length ? parts.join(" · ") : "订单中已登记的出行人";
+}
+
+function findSignatureForTraveler(traveler) {
+  if (!traveler) return null;
+  const directMatch = signatureByTravelerKey.value.get(normalizeId(traveler.id));
+  if (directMatch) {
+    return directMatch;
+  }
+  const travelerName = normalizeName(traveler.travelerName);
+  if (!travelerName) {
+    return null;
+  }
+  if ((travelerNameCounts.value.get(travelerName) || 0) !== 1) {
+    return null;
+  }
+  return signatures.value.find((item) => (
+    !normalizeId(item?.travelerId) && normalizeName(item?.signerName) === travelerName
+  )) || null;
+}
+
+function sanitizeTravelers(list) {
+  return (Array.isArray(list) ? list : []).filter((item) => (
+    item && normalizeId(item.id) && normalizeName(item.travelerName)
+  ));
+}
+
+function normalizeId(value) {
+  return value === null || value === undefined ? "" : String(value);
+}
+
+function normalizeName(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function resolveCount(value, fallback) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric >= 0 ? numeric : fallback;
+}
+
+watch(() => route.params.id, () => {
+  load();
+});
+
+watch(() => route.query.action, (action) => {
+  if (action === "sign" && canSign.value) {
+    nextTick(() => {
+      scrollToSignature();
+    });
+  }
+});
 
 onMounted(load);
 </script>
@@ -383,21 +694,38 @@ onMounted(load);
   box-shadow: 0 16px 40px rgba(15, 33, 63, 0.06);
 }
 
-.section-head {
+.section-head,
+.section-subhead {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 12px;
+}
+
+.section-head {
   margin-bottom: 16px;
 }
 
-.section-head h3 {
+.section-subhead {
+  margin-bottom: 14px;
+}
+
+.section-head h3,
+.section-subhead h4 {
   margin: 0;
-  font-size: 24px;
   color: #12233d;
 }
 
-.section-head span {
+.section-head h3 {
+  font-size: 24px;
+}
+
+.section-subhead h4 {
+  font-size: 18px;
+}
+
+.section-head span,
+.section-subhead span {
   color: #7a889d;
   font-size: 13px;
 }
@@ -443,7 +771,7 @@ onMounted(load);
 .summary-item strong {
   display: block;
   color: #152847;
-  line-height: 1.5;
+  line-height: 1.6;
   word-break: break-word;
 }
 
@@ -472,15 +800,121 @@ onMounted(load);
   white-space: pre-line;
 }
 
+.progress-strip {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  margin-bottom: 16px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #f8fbff 0%, #eef4fd 100%);
+  border: 1px solid #dfe8f6;
+}
+
+.progress-copy strong {
+  display: block;
+  font-size: 18px;
+  color: #13233d;
+}
+
+.progress-copy p {
+  margin: 8px 0 0;
+  line-height: 1.7;
+  color: #607089;
+}
+
+.progress-count {
+  min-width: 92px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 16px;
+  border-radius: 18px;
+  background: #fff;
+  color: #17324f;
+  font-size: 24px;
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px #dbe5f3;
+}
+
+.traveler-status-list {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.traveler-status-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: #fbfcff;
+  border: 1px solid #e3eaf6;
+}
+
+.traveler-status-item.done {
+  background: #f4fbf5;
+  border-color: #d5e9d8;
+}
+
+.traveler-status-main strong {
+  display: block;
+  color: #152847;
+  line-height: 1.5;
+}
+
+.traveler-status-main p {
+  margin: 8px 0 0;
+  color: #64748b;
+  line-height: 1.7;
+  word-break: break-word;
+}
+
+.traveler-status-side {
+  display: grid;
+  justify-items: end;
+  align-content: center;
+  gap: 8px;
+  min-width: 120px;
+  color: #7a879b;
+  font-size: 12px;
+}
+
+.signer-form-row {
+  display: grid;
+  grid-template-columns: minmax(0, 360px) minmax(220px, 1fr);
+  gap: 16px;
+  align-items: end;
+}
+
 .signer-form {
   display: grid;
   gap: 8px;
-  max-width: 360px;
 }
 
 .signer-form label {
   font-size: 14px;
   color: #54657e;
+}
+
+.signer-preview {
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: #f8fbff;
+  border: 1px solid #e2eaf5;
+}
+
+.signer-preview span {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: #7a879b;
+}
+
+.signer-preview strong {
+  color: #152847;
+  font-size: 18px;
 }
 
 .signature-hint {
@@ -513,55 +947,80 @@ onMounted(load);
   margin-top: 16px;
 }
 
-.signed-panel {
-  display: grid;
-  gap: 20px;
+.signed-complete {
+  padding: 18px 20px;
+  margin-top: 16px;
+  border-radius: 18px;
+  background: #f4fbf5;
+  border: 1px solid #d6ead9;
 }
 
-.signed-meta {
+.signed-complete strong {
+  display: block;
+  color: #206836;
+  font-size: 18px;
+}
+
+.signed-complete p {
+  margin: 8px 0 0;
+  color: #5c6c84;
+  line-height: 1.7;
+}
+
+.record-section {
+  margin-top: 22px;
+}
+
+.record-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 14px;
 }
 
-.signed-meta div {
-  padding: 16px 18px;
-  border-radius: 18px;
+.record-card {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border-radius: 20px;
   background: #f8fbff;
   border: 1px solid #e2eaf5;
 }
 
-.signed-meta span {
-  display: block;
-  margin-bottom: 8px;
+.record-head {
+  display: grid;
+  gap: 6px;
+}
+
+.record-head strong {
+  color: #162844;
+  line-height: 1.5;
+}
+
+.record-head span {
   color: #7a879b;
   font-size: 13px;
 }
 
-.signed-meta strong {
-  color: #162844;
-}
-
-.signature-preview {
-  min-height: 220px;
+.record-preview {
+  min-height: 180px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 20px;
+  border-radius: 18px;
   background: linear-gradient(180deg, #fbfcfe 0%, #f4f7fb 100%);
   border: 1px solid #e1e9f4;
   overflow: hidden;
 }
 
-.signature-preview img {
+.record-preview img {
   max-width: 100%;
-  max-height: 220px;
+  max-height: 180px;
   object-fit: contain;
 }
 
-.signature-fallback {
+.record-fallback {
   font-family: "KaiTi", "STKaiti", serif;
-  font-size: 44px;
+  font-size: 36px;
   color: #17324f;
 }
 
@@ -589,8 +1048,29 @@ onMounted(load);
     padding: 20px;
   }
 
-  .signed-meta {
+  .progress-strip,
+  .traveler-status-item,
+  .signer-form-row {
     grid-template-columns: 1fr;
+  }
+
+  .progress-strip,
+  .traveler-status-item {
+    display: grid;
+  }
+
+  .traveler-status-side {
+    justify-items: start;
+    min-width: 0;
+  }
+
+  .progress-count {
+    width: fit-content;
+  }
+
+  .signature-actions {
+    justify-content: stretch;
+    flex-direction: column;
   }
 }
 </style>

@@ -1,6 +1,9 @@
 package com.yutu.modules.order.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yutu.common.context.UserContext;
 import com.yutu.common.exception.BizException;
 import com.yutu.modules.model.entity.ContractTemplate;
@@ -25,14 +28,14 @@ import com.yutu.modules.order.dto.OrderTravelerItem;
 import com.yutu.modules.order.vo.OrderCreateVO;
 import com.yutu.modules.order.vo.OrderPaymentPrepareVO;
 import com.yutu.modules.order.vo.OrderPaymentStatusVO;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -45,6 +48,8 @@ import java.util.Objects;
 public class OrderService {
     private static final Logger log = LoggerFactory.getLogger(OrderService.class);
     private static final long PAYMENT_QR_REUSE_MINUTES = 10L;
+    private static final long PAYMENT_STATUS_CONFIRM_GRACE_MINUTES = 1L;
+
     private final TourOrderMapper tourOrderMapper;
     private final TourRouteMapper tourRouteMapper;
     private final TourDepartureDateMapper tourDepartureDateMapper;
@@ -55,6 +60,7 @@ public class OrderService {
     private final MerchantShopMapper merchantShopMapper;
     private final AlipaySandboxService alipaySandboxService;
     private final ObjectMapper objectMapper;
+    private final long paymentTimeoutMinutes;
 
     public OrderService(TourOrderMapper tourOrderMapper,
             TourRouteMapper tourRouteMapper,
@@ -65,7 +71,8 @@ public class OrderService {
             TourContractMapper tourContractMapper,
             MerchantShopMapper merchantShopMapper,
             AlipaySandboxService alipaySandboxService,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            @Value("${app.order.payment-timeout-minutes:30}") long paymentTimeoutMinutes) {
         this.tourOrderMapper = tourOrderMapper;
         this.tourRouteMapper = tourRouteMapper;
         this.tourDepartureDateMapper = tourDepartureDateMapper;
@@ -76,6 +83,7 @@ public class OrderService {
         this.merchantShopMapper = merchantShopMapper;
         this.alipaySandboxService = alipaySandboxService;
         this.objectMapper = objectMapper;
+        this.paymentTimeoutMinutes = paymentTimeoutMinutes;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -86,6 +94,7 @@ public class OrderService {
                 || !Objects.equals(route.getAuditStatus(), 1)) {
             throw new BizException(400, "路线不可预订");
         }
+
         TourDepartureDate departureDate = tourDepartureDateMapper.selectById(request.getDepartDateId());
         if (departureDate == null
                 || !Objects.equals(departureDate.getRouteId(), route.getId())
@@ -94,11 +103,12 @@ public class OrderService {
             throw new BizException(400, "出发日期无效");
         }
         if (departureDate.getDepartDate() == null || departureDate.getDepartDate().isBefore(LocalDate.now())) {
-            throw new BizException(400, "鍑哄彂鏃ユ湡宸茶繃鏈燂紝璇烽噸鏂伴€夋嫨");
+            throw new BizException(400, "出发日期已过期");
         }
         if (departureDate.getRemainCount() < request.getTravelerCount()) {
             throw new BizException(400, "库存不足");
         }
+
         departureDate.setRemainCount(departureDate.getRemainCount() - request.getTravelerCount());
         tourDepartureDateMapper.updateById(departureDate);
 
@@ -139,9 +149,10 @@ public class OrderService {
     }
 
     public List<TourOrder> userOrders() {
-        return tourOrderMapper.selectList(new LambdaQueryWrapper<TourOrder>()
+        List<TourOrder> orders = tourOrderMapper.selectList(new LambdaQueryWrapper<TourOrder>()
                 .eq(TourOrder::getUserId, currentUserId())
                 .orderByDesc(TourOrder::getCreateTime));
+        return decorateOrders(orders);
     }
 
     public Map<String, Object> userOrderDetail(Long id) {
@@ -154,15 +165,20 @@ public class OrderService {
 
     @Transactional(rollbackFor = Exception.class)
     public void cancel(Long id) {
-        TourOrder order = tourOrderMapper.selectById(id);
-        if (order == null || !Objects.equals(order.getUserId(), currentUserId())) {
-            throw new BizException(404, "订单不存在");
+        TourOrder order = getOwnedOrder(id);
+        if (isOverdueCancelled(order)) {
+            throw new BizException(400, "订单已超时未支付，系统已自动取消");
         }
-        if (!"PENDING_PAY".equals(order.getOrderStatus())) {
+        if (!canCancelPendingPaymentOrder(order)) {
             throw new BizException(400, "当前状态不可取消");
         }
-        order.setOrderStatus("CANCELLED");
-        tourOrderMapper.updateById(order);
+        if (!cancelPendingUnpaidOrder(order)) {
+            TourOrder latestOrder = refreshOrderPaymentStateById(id);
+            if (isOverdueCancelled(latestOrder)) {
+                throw new BizException(400, "订单已超时未支付，系统已自动取消");
+            }
+            throw new BizException(400, "当前状态不可取消");
+        }
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -171,15 +187,27 @@ public class OrderService {
         if ("PAID".equals(order.getPayStatus())) {
             return buildPaidPaymentPrepare(order, latestPayRecord(order.getId()));
         }
+        if (isOverdueCancelled(order)) {
+            throw new BizException(400, "订单支付时限已过，系统已自动取消");
+        }
+        if (Boolean.TRUE.equals(order.getPaymentExpired())) {
+            throw new BizException(400, "订单已超过支付时限，正在确认支付结果，请稍后刷新");
+        }
+        if (!canCancelPendingPaymentOrder(order)) {
+            throw new BizException(400, "当前订单状态不可支付");
+        }
         if (!"SIGNED".equals(order.getContractStatus())) {
             throw new BizException(400, "请先完成合同签署，再进入支付");
         }
 
         PayRecord payRecord = latestPayRecord(order.getId());
         if (payRecord != null && "WAIT_BUYER_PAY".equals(payRecord.getPayStatus())) {
-            order = tourOrderMapper.selectById(id);
-            if ("PAID".equals(order.getPayStatus())) {
+            order = refreshOrderPaymentStateById(id);
+            if (order != null && "PAID".equals(order.getPayStatus())) {
                 return buildPaidPaymentPrepare(order, latestPayRecord(order.getId()));
+            }
+            if (isOverdueCancelled(order)) {
+                throw new BizException(400, "订单支付时限已过，系统已自动取消");
             }
             String cachedQrCode = getPayRecordExtra(payRecord, "qrCode");
             String cachedQrCodeImage = getPayRecordExtra(payRecord, "qrCodeImage");
@@ -191,7 +219,7 @@ public class OrderService {
 
         String payNo = generateNo("PAY");
         AlipaySandboxService.PrecreateResult precreateResult = alipaySandboxService.preCreate(
-                "豫途旅游订单-" + order.getOrderNo(),
+                "豫途旅游订单 " + order.getOrderNo(),
                 payNo,
                 order.getPayAmount());
 
@@ -202,9 +230,10 @@ public class OrderService {
         newPayRecord.setPayType("ALIPAY_SANDBOX");
         newPayRecord.setPayAmount(order.getPayAmount());
         newPayRecord.setPayStatus("WAIT_BUYER_PAY");
-        newPayRecord
-                .setCallbackContent(writePaymentSnapshot(precreateResult.getQrCode(), precreateResult.getQrCodeImage(),
-                        precreateResult.getRawBody()));
+        newPayRecord.setCallbackContent(writePaymentSnapshot(
+                precreateResult.getQrCode(),
+                precreateResult.getQrCodeImage(),
+                precreateResult.getRawBody()));
         payRecordMapper.insert(newPayRecord);
 
         return buildPendingPaymentPrepare(order, newPayRecord, precreateResult.getQrCode(),
@@ -219,11 +248,14 @@ public class OrderService {
         if ("PAID".equals(order.getPayStatus())) {
             return buildPaymentStatus(order, payRecord, true);
         }
+        if (isOverdueCancelled(order) || !"PENDING_PAY".equals(order.getOrderStatus())) {
+            return buildPaymentStatus(order, payRecord, false);
+        }
         if (payRecord == null) {
             return buildPaymentStatus(order, null, false);
         }
         if (!"WAIT_BUYER_PAY".equals(payRecord.getPayStatus())) {
-            return buildPaymentStatus(order, payRecord, "PAID".equals(order.getPayStatus()));
+            return buildPaymentStatus(order, payRecord, false);
         }
 
         AlipaySandboxService.QueryResult queryResult;
@@ -233,22 +265,51 @@ public class OrderService {
             log.warn("failed to sync payment status, orderId={}, payNo={}", order.getId(), payRecord.getPayNo(), ex);
             return buildPaymentStatus(order, payRecord, false);
         }
+
         String tradeStatus = queryResult.getTradeStatus();
         if ("TRADE_SUCCESS".equals(tradeStatus) || "TRADE_FINISHED".equals(tradeStatus)) {
             syncPaidOrder(order, payRecord, queryResult);
             return buildPaymentStatus(order, payRecord, true);
         }
         if ("TRADE_CLOSED".equals(tradeStatus)) {
-            payRecord.setPayStatus("FAILED");
-            payRecord.setCallbackContent(mergePayRecordSnapshot(payRecord.getCallbackContent(), queryResult));
-            payRecordMapper.updateById(payRecord);
+            failPendingPayRecord(payRecord, queryResult);
             return buildPaymentStatus(order, payRecord, false);
         }
         if (queryResult.isSuccess()) {
             payRecord.setCallbackContent(mergePayRecordSnapshot(payRecord.getCallbackContent(), queryResult));
             payRecordMapper.updateById(payRecord);
         }
+        refreshOrderPaymentWindow(order);
         return buildPaymentStatus(order, payRecord, false);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public int expireOverdueOrders() {
+        List<TourOrder> orders = tourOrderMapper.selectList(new LambdaQueryWrapper<TourOrder>()
+                .eq(TourOrder::getOrderStatus, "PENDING_PAY")
+                .eq(TourOrder::getPayStatus, "UNPAID")
+                .le(TourOrder::getCreateTime, LocalDateTime.now().minusMinutes(paymentTimeoutMinutes)));
+        int cancelledCount = 0;
+        for (TourOrder order : orders) {
+            if (order == null) {
+                continue;
+            }
+            String previousStatus = order.getOrderStatus();
+            refreshOrderPaymentState(order);
+            if (!Objects.equals(previousStatus, order.getOrderStatus()) && "CANCELLED".equals(order.getOrderStatus())) {
+                cancelledCount++;
+            }
+        }
+        return cancelledCount;
+    }
+
+    public TourOrder refreshOrderPaymentStateById(Long orderId) {
+        TourOrder order = tourOrderMapper.selectById(orderId);
+        if (order == null) {
+            return null;
+        }
+        refreshOrderPaymentState(order);
+        return order;
     }
 
     private TourContract createContractForOrder(TourOrder order) {
@@ -265,7 +326,7 @@ public class OrderService {
         contract.setTemplateId(template.getId());
         contract.setUserId(order.getUserId());
         contract.setMerchantId(order.getMerchantId());
-        contract.setContractTitle("豫途旅游服务合同-" + order.getOrderNo());
+        contract.setContractTitle("豫途旅游服务合同 " + order.getOrderNo());
         contract.setContractContent(template.getTemplateContent());
         contract.setSignStatus("UNSIGNED");
         contract.setDeleted(0);
@@ -283,6 +344,7 @@ public class OrderService {
         if (order == null || !Objects.equals(order.getUserId(), currentUserId())) {
             throw new BizException(404, "订单不存在");
         }
+        refreshOrderPaymentState(order);
         return order;
     }
 
@@ -295,6 +357,7 @@ public class OrderService {
 
     private OrderPaymentPrepareVO buildPendingPaymentPrepare(TourOrder order, PayRecord payRecord, String qrCode,
             String qrCodeImage) {
+        refreshOrderPaymentWindow(order);
         OrderPaymentPrepareVO result = new OrderPaymentPrepareVO();
         result.setOrderId(order.getId());
         result.setOrderNo(order.getOrderNo());
@@ -308,6 +371,7 @@ public class OrderService {
     }
 
     private OrderPaymentPrepareVO buildPaidPaymentPrepare(TourOrder order, PayRecord payRecord) {
+        refreshOrderPaymentWindow(order);
         OrderPaymentPrepareVO result = new OrderPaymentPrepareVO();
         result.setOrderId(order.getId());
         result.setOrderNo(order.getOrderNo());
@@ -319,6 +383,7 @@ public class OrderService {
     }
 
     private OrderPaymentStatusVO buildPaymentStatus(TourOrder order, PayRecord payRecord, boolean paid) {
+        refreshOrderPaymentWindow(order);
         OrderPaymentStatusVO result = new OrderPaymentStatusVO();
         result.setOrderId(order.getId());
         result.setOrderNo(order.getOrderNo());
@@ -338,10 +403,11 @@ public class OrderService {
         order.setPayStatus("PAID");
         order.setOrderStatus("COMPLETED");
         tourOrderMapper.updateById(order);
+        refreshOrderPaymentWindow(order);
     }
 
     private String writePaymentSnapshot(String qrCode, String qrCodeImage, String rawBody) {
-        Map<String, Object> payload = new HashMap<String, Object>();
+        Map<String, Object> payload = new HashMap<>();
         payload.put("qrCode", qrCode);
         payload.put("qrCodeImage", qrCodeImage);
         payload.put("rawBody", rawBody);
@@ -365,13 +431,13 @@ public class OrderService {
 
     private Map<String, Object> readJsonMap(String content) {
         if (content == null || content.trim().isEmpty()) {
-            return new HashMap<String, Object>();
+            return new HashMap<>();
         }
         try {
             return objectMapper.readValue(content, new TypeReference<Map<String, Object>>() {
             });
         } catch (Exception ex) {
-            return new HashMap<String, Object>();
+            return new HashMap<>();
         }
     }
 
@@ -396,8 +462,198 @@ public class OrderService {
     }
 
     private void expirePendingPayRecord(PayRecord payRecord) {
+        if (payRecord == null || !"WAIT_BUYER_PAY".equals(payRecord.getPayStatus())) {
+            return;
+        }
         payRecord.setPayStatus("FAILED");
         payRecordMapper.updateById(payRecord);
+    }
+
+    private void failPendingPayRecord(PayRecord payRecord, AlipaySandboxService.QueryResult queryResult) {
+        if (payRecord == null || !"WAIT_BUYER_PAY".equals(payRecord.getPayStatus())) {
+            return;
+        }
+        payRecord.setPayStatus("FAILED");
+        payRecord.setCallbackContent(mergePayRecordSnapshot(payRecord.getCallbackContent(), queryResult));
+        payRecordMapper.updateById(payRecord);
+    }
+
+    private List<TourOrder> decorateOrders(List<TourOrder> orders) {
+        if (orders == null || orders.isEmpty()) {
+            return orders;
+        }
+        for (TourOrder order : orders) {
+            refreshOrderPaymentState(order);
+        }
+        return orders;
+    }
+
+    private void refreshOrderPaymentState(TourOrder order) {
+        if (order == null) {
+            return;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        if (!canExpirePendingPaymentOrder(order) || !hasPaymentExpired(order, now)) {
+            refreshOrderPaymentWindow(order, now);
+            return;
+        }
+        reconcileExpiredPaymentOrder(order);
+        refreshOrderPaymentWindow(order, LocalDateTime.now());
+    }
+
+    private void reconcileExpiredPaymentOrder(TourOrder order) {
+        if (!canExpirePendingPaymentOrder(order)) {
+            return;
+        }
+
+        PayRecord payRecord = latestPayRecord(order.getId());
+        if (payRecord != null && "WAIT_BUYER_PAY".equals(payRecord.getPayStatus()) && hasText(payRecord.getPayNo())
+                && alipaySandboxService.isConfigured()) {
+            try {
+                AlipaySandboxService.QueryResult queryResult = alipaySandboxService.query(payRecord.getPayNo());
+                String tradeStatus = queryResult.getTradeStatus();
+                if ("TRADE_SUCCESS".equals(tradeStatus) || "TRADE_FINISHED".equals(tradeStatus)) {
+                    syncPaidOrder(order, payRecord, queryResult);
+                    return;
+                }
+                if ("TRADE_CLOSED".equals(tradeStatus)) {
+                    failPendingPayRecord(payRecord, queryResult);
+                } else if (queryResult.isSuccess()) {
+                    payRecord.setCallbackContent(mergePayRecordSnapshot(payRecord.getCallbackContent(), queryResult));
+                    payRecordMapper.updateById(payRecord);
+                }
+            } catch (Exception ex) {
+                log.warn("failed to reconcile overdue payment before auto cancel, orderId={}, payNo={}",
+                        order.getId(), payRecord.getPayNo(), ex);
+                if (!hasExceededPaymentConfirmGrace(order, LocalDateTime.now())) {
+                    return;
+                }
+            }
+        }
+
+        if (cancelPendingUnpaidOrder(order)) {
+            log.info("cancelled overdue unpaid order, orderId={}, orderNo={}", order.getId(), order.getOrderNo());
+        }
+    }
+
+    private boolean cancelPendingUnpaidOrder(TourOrder order) {
+        if (order == null || order.getId() == null) {
+            return false;
+        }
+
+        int updated = tourOrderMapper.update(null, new LambdaUpdateWrapper<TourOrder>()
+                .eq(TourOrder::getId, order.getId())
+                .eq(TourOrder::getOrderStatus, "PENDING_PAY")
+                .eq(TourOrder::getPayStatus, "UNPAID")
+                .set(TourOrder::getOrderStatus, "CANCELLED"));
+        if (updated <= 0) {
+            return false;
+        }
+
+        order.setOrderStatus("CANCELLED");
+        restoreDepartureInventory(order);
+        expireOpenPayRecords(order.getId());
+        refreshOrderPaymentWindow(order);
+        return true;
+    }
+
+    private void restoreDepartureInventory(TourOrder order) {
+        if (order == null || order.getDepartDateId() == null || order.getTravelerCount() == null
+                || order.getTravelerCount() <= 0) {
+            return;
+        }
+        TourDepartureDate departureDate = tourDepartureDateMapper.selectById(order.getDepartDateId());
+        if (departureDate == null) {
+            return;
+        }
+        int remainCount = departureDate.getRemainCount() == null ? 0 : departureDate.getRemainCount();
+        departureDate.setRemainCount(remainCount + order.getTravelerCount());
+        tourDepartureDateMapper.updateById(departureDate);
+    }
+
+    private void expireOpenPayRecords(Long orderId) {
+        if (orderId == null) {
+            return;
+        }
+        List<PayRecord> payRecords = payRecordMapper.selectList(new LambdaQueryWrapper<PayRecord>()
+                .eq(PayRecord::getOrderId, orderId)
+                .eq(PayRecord::getPayStatus, "WAIT_BUYER_PAY"));
+        for (PayRecord payRecord : payRecords) {
+            expirePendingPayRecord(payRecord);
+        }
+    }
+
+    private boolean canCancelPendingPaymentOrder(TourOrder order) {
+        return order != null
+                && "PENDING_PAY".equals(order.getOrderStatus())
+                && "UNPAID".equals(order.getPayStatus());
+    }
+
+    private boolean canExpirePendingPaymentOrder(TourOrder order) {
+        return canCancelPendingPaymentOrder(order);
+    }
+
+    private boolean isOverdueCancelled(TourOrder order) {
+        return order != null
+                && "CANCELLED".equals(order.getOrderStatus())
+                && "UNPAID".equals(order.getPayStatus())
+                && Boolean.TRUE.equals(order.getPaymentExpired());
+    }
+
+    private void refreshOrderPaymentWindow(TourOrder order) {
+        refreshOrderPaymentWindow(order, LocalDateTime.now());
+    }
+
+    private void refreshOrderPaymentWindow(TourOrder order, LocalDateTime now) {
+        if (order == null) {
+            return;
+        }
+        order.setPaymentTimeoutMinutes(paymentTimeoutMinutes);
+        order.setPaymentExpireTime(resolvePaymentExpireTime(order));
+        order.setPaymentExpired(isUnpaidOrderPastDeadline(order, now));
+        order.setPaymentRemainingSeconds(resolveRemainingPaymentSeconds(order, now));
+    }
+
+    private LocalDateTime resolvePaymentExpireTime(TourOrder order) {
+        if (order == null || order.getCreateTime() == null) {
+            return null;
+        }
+        return order.getCreateTime().plusMinutes(paymentTimeoutMinutes);
+    }
+
+    private long resolveRemainingPaymentSeconds(TourOrder order, LocalDateTime now) {
+        if (!canCancelPendingPaymentOrder(order)) {
+            return 0L;
+        }
+        LocalDateTime expireTime = resolvePaymentExpireTime(order);
+        if (expireTime == null) {
+            return 0L;
+        }
+        return Math.max(Duration.between(now, expireTime).getSeconds(), 0L);
+    }
+
+    private boolean hasPaymentExpired(TourOrder order, LocalDateTime now) {
+        if (!canExpirePendingPaymentOrder(order)) {
+            return false;
+        }
+        LocalDateTime expireTime = resolvePaymentExpireTime(order);
+        return expireTime != null && !now.isBefore(expireTime);
+    }
+
+    private boolean isUnpaidOrderPastDeadline(TourOrder order, LocalDateTime now) {
+        if (order == null || !"UNPAID".equals(order.getPayStatus())) {
+            return false;
+        }
+        LocalDateTime expireTime = resolvePaymentExpireTime(order);
+        return expireTime != null && !now.isBefore(expireTime);
+    }
+
+    private boolean hasExceededPaymentConfirmGrace(TourOrder order, LocalDateTime now) {
+        LocalDateTime expireTime = resolvePaymentExpireTime(order);
+        if (expireTime == null) {
+            return true;
+        }
+        return !now.isBefore(expireTime.plusMinutes(PAYMENT_STATUS_CONFIRM_GRACE_MINUTES));
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -418,9 +674,10 @@ public class OrderService {
 
     public List<TourOrder> merchantOrders() {
         Long shopId = currentMerchantShopId();
-        return tourOrderMapper.selectList(new LambdaQueryWrapper<TourOrder>()
+        List<TourOrder> orders = tourOrderMapper.selectList(new LambdaQueryWrapper<TourOrder>()
                 .eq(TourOrder::getMerchantId, shopId)
                 .orderByDesc(TourOrder::getCreateTime));
+        return decorateOrders(orders);
     }
 
     public Map<String, Object> merchantOrderDetail(Long id) {
@@ -432,8 +689,9 @@ public class OrderService {
     }
 
     public List<TourOrder> adminOrders() {
-        return tourOrderMapper.selectList(new LambdaQueryWrapper<TourOrder>()
+        List<TourOrder> orders = tourOrderMapper.selectList(new LambdaQueryWrapper<TourOrder>()
                 .orderByDesc(TourOrder::getCreateTime));
+        return decorateOrders(orders);
     }
 
     public List<PayRecord> adminPayRecords() {
@@ -446,13 +704,14 @@ public class OrderService {
         if (order == null) {
             throw new BizException(404, "订单不存在");
         }
-        if ("PENDING_PAY".equals(order.getOrderStatus())) {
-            order.setOrderStatus("CANCELLED");
-            tourOrderMapper.updateById(order);
+        refreshOrderPaymentState(order);
+        if (canCancelPendingPaymentOrder(order)) {
+            cancelPendingUnpaidOrder(order);
         }
     }
 
     private Map<String, Object> orderDetailMap(TourOrder order) {
+        refreshOrderPaymentState(order);
         List<TourOrderTraveler> travelers = tourOrderTravelerMapper
                 .selectList(new LambdaQueryWrapper<TourOrderTraveler>()
                         .eq(TourOrderTraveler::getOrderId, order.getId()));
@@ -492,12 +751,10 @@ public class OrderService {
     }
 
     public void complete(Long id) {
-        // TODO Auto-generated method stub
         throw new UnsupportedOperationException("Unimplemented method 'complete'");
     }
 
     public void review(Long id, OrderReviewRequest request) {
-        // TODO Auto-generated method stub
         throw new UnsupportedOperationException("Unimplemented method 'review'");
     }
 }

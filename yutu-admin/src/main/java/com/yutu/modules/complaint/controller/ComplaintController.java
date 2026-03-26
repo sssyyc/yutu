@@ -3,6 +3,7 @@ package com.yutu.modules.complaint.controller;
 import com.yutu.common.result.Result;
 import com.yutu.modules.complaint.dto.ComplaintCreateRequest;
 import com.yutu.modules.complaint.service.ComplaintService;
+import com.yutu.modules.complaint.vo.ComplaintRouteOptionVO;
 import com.yutu.modules.model.entity.ComplaintOrder;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
@@ -29,6 +30,12 @@ public class ComplaintController {
     @PostMapping
     public Result<Long> create(@Validated @RequestBody ComplaintCreateRequest request) {
         return Result.ok(complaintService.create(request));
+    }
+
+    @PreAuthorize("hasAuthority('complaint:create')")
+    @GetMapping("/route-options")
+    public Result<List<ComplaintRouteOptionVO>> routeOptions() {
+        return Result.ok(complaintService.userComplaintRouteOptions());
     }
 
     @PreAuthorize("hasAuthority('complaint:list')")

@@ -16,6 +16,7 @@ public class TourContractSignature extends BaseEntity {
     private Long id;
     private Long contractId;
     private Long userId;
+    private Long travelerId;
     private String signerName;
     private String signatureImage;
     private LocalDateTime signTime;

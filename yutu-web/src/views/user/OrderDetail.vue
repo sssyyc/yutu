@@ -5,10 +5,16 @@
         <p class="eyebrow">ORDER CENTER</p>
         <h1>{{ order.orderNo }}</h1>
 
+        <div v-if="showPaymentNotice" class="payment-notice" :class="paymentNoticeTone">
+          <strong>{{ paymentNoticeTitle }}</strong>
+          <span>{{ paymentNoticeText }}</span>
+        </div>
+
         <div class="hero-actions">
           <el-button
             v-if="primaryContract && order.contractStatus !== 'SIGNED'"
             type="warning"
+            :disabled="!canContinueContract"
             @click="goContract(true)"
           >
             继续签署合同
@@ -16,7 +22,7 @@
           <el-button
             v-if="order.payStatus !== 'PAID'"
             type="success"
-            :disabled="order.contractStatus !== 'SIGNED'"
+            :disabled="!canGoPay"
             @click="goPay"
           >
             去支付
@@ -33,7 +39,7 @@
             <span>2</span>
             <strong>{{ order.contractStatus === "SIGNED" ? "合同已签署" : "等待签署合同" }}</strong>
           </div>
-          <div class="flow-item" :class="{ done: order.payStatus === 'PAID', active: order.contractStatus === 'SIGNED' && order.payStatus !== 'PAID' }">
+          <div class="flow-item" :class="{ done: order.payStatus === 'PAID', active: canGoPay }">
             <span>3</span>
             <strong>{{ order.payStatus === "PAID" ? "支付已完成" : "等待支付" }}</strong>
           </div>
@@ -54,6 +60,14 @@
           <span>下单时间</span>
           <strong>{{ formatDateTime(order.createTime) }}</strong>
         </div>
+        <div class="hero-metric">
+          <span>支付截止时间</span>
+          <strong>{{ paymentDeadlineText }}</strong>
+        </div>
+        <div class="hero-metric" v-if="showPaymentNotice">
+          <span>支付剩余时间</span>
+          <strong>{{ paymentCountdownText }}</strong>
+        </div>
       </aside>
     </section>
 
@@ -71,8 +85,8 @@
         <strong>{{ contractStatusLabel }}</strong>
       </article>
       <article class="page-card metric-card">
-        <span>支付金额</span>
-        <strong>¥ {{ formatMoney(order.payAmount) }}</strong>
+        <span>支付时限</span>
+        <strong>{{ paymentWindowLabel }}</strong>
       </article>
     </section>
 
@@ -117,6 +131,7 @@
                 v-if="row.signStatus !== 'SIGNED'"
                 type="warning"
                 text
+                :disabled="!canContinueContract"
                 @click="$router.push(`/contract/detail/${row.id}?action=sign`)"
               >
                 去签署
@@ -131,30 +146,111 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from "vue"
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { api } from "../../api"
+import {
+  formatPaymentCountdown,
+  formatPaymentDeadlineTime,
+  getPaymentRemainingSeconds,
+  isPaymentCountdownActive,
+  isPaymentExpired
+} from "../../utils/paymentDeadline"
 
 const route = useRoute()
 const router = useRouter()
 const detail = ref({})
+const nowMs = ref(Date.now())
+
+let clockTimer = null
+let expiryRefreshLock = false
+let lastExpiryRefreshAt = 0
 
 const order = computed(() => detail.value.order || {})
 const travelers = computed(() => detail.value.travelers || [])
 const contracts = computed(() => detail.value.contracts || [])
 const primaryContract = computed(() => contracts.value[0] || null)
+const paymentTimeoutMinutes = computed(() => Number(order.value.paymentTimeoutMinutes) || 30)
 
 const orderStatusLabel = computed(() => mapOrderStatus(order.value.orderStatus))
 const payStatusLabel = computed(() => mapPayStatus(order.value.payStatus))
 const contractStatusLabel = computed(() => mapContractStatus(order.value.contractStatus))
 
+const isPendingPayment = computed(() => isPaymentCountdownActive(order.value))
+const paymentExpired = computed(() => isPaymentExpired(order.value, nowMs.value))
+const overdueCancelled = computed(() => order.value.orderStatus === "CANCELLED" && paymentExpired.value)
+const canContinueContract = computed(() => isPendingPayment.value && !paymentExpired.value)
+const canGoPay = computed(() => isPendingPayment.value && order.value.contractStatus === "SIGNED" && !paymentExpired.value)
+const paymentDeadlineText = computed(() => formatPaymentDeadlineTime(order.value))
+const paymentCountdownText = computed(() => {
+  if (overdueCancelled.value) return "已超时"
+  if (paymentExpired.value && isPendingPayment.value) return "系统处理中"
+  if (!isPendingPayment.value) return "-"
+  return formatPaymentCountdown(getPaymentRemainingSeconds(order.value, nowMs.value))
+})
+const paymentWindowLabel = computed(() => {
+  if (overdueCancelled.value) return "超时自动取消"
+  if (paymentExpired.value && isPendingPayment.value) return "超时处理中"
+  if (isPendingPayment.value) return paymentCountdownText.value
+  return "已结束"
+})
+const showPaymentNotice = computed(() => isPendingPayment.value || overdueCancelled.value)
+const paymentNoticeTone = computed(() => ({
+  warning: isPendingPayment.value && !paymentExpired.value,
+  danger: overdueCancelled.value || paymentExpired.value
+}))
+const paymentNoticeTitle = computed(() => {
+  if (overdueCancelled.value) return "订单已超时取消"
+  if (paymentExpired.value) return "支付结果确认中"
+  return `请在 ${paymentTimeoutMinutes.value} 分钟内完成支付`
+})
+const paymentNoticeText = computed(() => {
+  if (overdueCancelled.value) {
+    return "该订单在下单后半小时内未完成支付，系统已自动取消。"
+  }
+  if (paymentExpired.value) {
+    return "订单已到支付截止时间，系统正在确认最终支付结果，请稍后刷新。"
+  }
+  return `剩余支付时间 ${paymentCountdownText.value}，超时后系统会自动取消订单。`
+})
+
 const statusTone = computed(() => ({
   success: order.value.payStatus === "PAID",
-  warning: order.value.payStatus !== "PAID"
+  warning: order.value.payStatus !== "PAID" && !overdueCancelled.value,
+  danger: overdueCancelled.value
 }))
 
 async function load() {
   detail.value = await api.get(`/orders/${route.params.id}`)
+}
+
+function startClock() {
+  stopClock()
+  clockTimer = window.setInterval(async () => {
+    nowMs.value = Date.now()
+    if (shouldRefreshExpiredOrder()) {
+      lastExpiryRefreshAt = Date.now()
+      expiryRefreshLock = true
+      try {
+        await load()
+      } finally {
+        expiryRefreshLock = false
+      }
+    }
+  }, 1000)
+}
+
+function stopClock() {
+  if (clockTimer) {
+    window.clearInterval(clockTimer)
+    clockTimer = null
+  }
+}
+
+function shouldRefreshExpiredOrder() {
+  if (expiryRefreshLock) return false
+  if (Date.now() - lastExpiryRefreshAt < 10000) return false
+  return isPendingPayment.value && getPaymentRemainingSeconds(order.value, nowMs.value) <= 0
 }
 
 function goContract(withSignAction = false) {
@@ -169,6 +265,7 @@ function goPay() {
 function mapOrderStatus(status) {
   const textMap = {
     PENDING_PAY: "待支付",
+    PENDING_TRAVEL: "待出行",
     COMPLETED: "已完成",
     CANCELLED: "已取消",
     REFUNDING: "退款中",
@@ -205,7 +302,10 @@ function formatDateTime(value) {
   return String(value).replace("T", " ").slice(0, 19)
 }
 
-onMounted(load)
+onMounted(async () => {
+  await load()
+  startClock()
+})
 
 watch(
   () => route.params.id,
@@ -215,6 +315,10 @@ watch(
     }
   }
 )
+
+onBeforeUnmount(() => {
+  stopClock()
+})
 </script>
 
 <style scoped>
@@ -247,6 +351,34 @@ watch(
   margin: 0;
   font-size: clamp(28px, 2.8vw, 40px);
   line-height: 1.18;
+}
+
+.payment-notice {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+  padding: 16px 18px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.payment-notice.warning {
+  background: rgba(251, 191, 36, 0.16);
+  color: #fef3c7;
+}
+
+.payment-notice.danger {
+  background: rgba(248, 113, 113, 0.16);
+  color: #fee2e2;
+}
+
+.payment-notice strong {
+  font-size: 16px;
+}
+
+.payment-notice span {
+  line-height: 1.7;
 }
 
 .hero-actions {
@@ -481,10 +613,7 @@ watch(
     grid-template-columns: 1fr;
   }
 
-  .section-head {
-    flex-direction: column;
-  }
-
+  .section-head,
   .contract-main {
     flex-direction: column;
     align-items: flex-start;

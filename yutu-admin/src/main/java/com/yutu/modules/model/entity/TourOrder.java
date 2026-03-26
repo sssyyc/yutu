@@ -9,6 +9,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -33,4 +34,16 @@ public class TourOrder extends BaseEntity {
 
     @TableField(exist = false)
     private Boolean hasReviewed;
+
+    @TableField(exist = false)
+    private LocalDateTime paymentExpireTime;
+
+    @TableField(exist = false)
+    private Long paymentRemainingSeconds;
+
+    @TableField(exist = false)
+    private Boolean paymentExpired;
+
+    @TableField(exist = false)
+    private Long paymentTimeoutMinutes;
 }

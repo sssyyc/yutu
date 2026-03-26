@@ -1,6 +1,7 @@
 package com.yutu.modules.model.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -26,4 +27,13 @@ public class ComplaintOrder extends BaseEntity {
     private String resultContent;
     @TableLogic
     private Integer deleted;
+
+    @TableField(exist = false)
+    private String orderNo;
+
+    @TableField(exist = false)
+    private Long routeId;
+
+    @TableField(exist = false)
+    private String routeName;
 }

@@ -18,7 +18,6 @@ project
 │  │  └─ modules             # 业务模块（auth/home/route/order/contract/complaint/merchant/admin/user）
 │  └─ src/main/resources
 │     ├─ application.yml
-│     ├─ application-dev.yml
 │     └─ sql/init.sql
 ├─ yutu-web                  # 前端
 │  ├─ src/api
@@ -45,8 +44,12 @@ project
    执行 [`yutu-admin/src/main/resources/sql/init.sql`](./yutu-admin/src/main/resources/sql/init.sql)
 2. 默认数据库名：`yutu_travel`
 3. 默认配置（可改）：
-   - MySQL：`127.0.0.1:3306`
+   - MySQL：`127.0.0.1:3307`
    - Redis：`127.0.0.1:6379`
+4. 当前初始化数据版本：
+   - `8` 个用户
+   - `3` 条路线
+   - `14` 笔订单
 
 ## 4. 后端启动
 
@@ -76,6 +79,7 @@ npm run dev
 - 用户：`user01 / 123456`
 - 商家：`merchant01 / 123456`
 - 管理员：`admin01 / 123456`
+- 商家扩展示例：`syc / 123456`
 
 > 首次登录时若数据库中为明文密码，后端会自动升级为 BCrypt。
 

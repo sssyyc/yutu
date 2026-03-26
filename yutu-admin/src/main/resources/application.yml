@@ -40,6 +40,8 @@ jwt:
 app:
   token:
     redis-prefix: "YUTU:TOKEN:"
+  order:
+    payment-timeout-minutes: ${ORDER_PAYMENT_TIMEOUT_MINUTES:30}
   file:
     upload-dir: uploads
   alipay:

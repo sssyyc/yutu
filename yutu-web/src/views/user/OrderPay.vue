@@ -3,7 +3,13 @@
     <section v-if="order.id" class="page-card hero-card">
       <div class="hero-copy">
         <p class="eyebrow">PAYMENT CENTER</p>
-        <h1>完成支付，订单就会自动进入已完成状态</h1>
+        <h1>{{ heroTitle }}</h1>
+
+        <div class="deadline-board" :class="deadlineBoardTone">
+          <span class="deadline-label">支付截止时间</span>
+          <strong>{{ paymentDeadlineText }}</strong>
+          <p>{{ deadlineDescription }}</p>
+        </div>
 
         <div class="flow-strip">
           <div class="flow-item done">
@@ -14,7 +20,7 @@
             <span>2</span>
             <strong>签署合同</strong>
           </div>
-          <div class="flow-item" :class="{ done: isPaid, active: !needsContractSign && !isPaid }">
+          <div class="flow-item" :class="{ done: isPaid, active: canPreparePayment || shouldSyncExpiredPayment }">
             <span>3</span>
             <strong>完成支付</strong>
           </div>
@@ -22,9 +28,7 @@
       </div>
 
       <aside class="hero-panel">
-        <div class="status-pill" :class="statusTone">
-          {{ statusText }}
-        </div>
+        <div class="status-pill" :class="statusTone">{{ statusText }}</div>
         <div class="hero-metric">
           <span>订单号</span>
           <strong>{{ order.orderNo || "-" }}</strong>
@@ -32,6 +36,10 @@
         <div class="hero-metric">
           <span>支付金额</span>
           <strong>¥ {{ formatMoney(order.payAmount) }}</strong>
+        </div>
+        <div class="hero-metric">
+          <span>支付剩余时间</span>
+          <strong>{{ paymentCountdownText }}</strong>
         </div>
         <div class="hero-metric">
           <span>最近同步</span>
@@ -63,6 +71,21 @@
           </div>
         </template>
 
+        <template v-else-if="overdueCancelled">
+          <el-result
+            icon="warning"
+            title="订单已超时取消"
+            sub-title="该订单在下单后半小时内未完成支付，系统已自动取消。"
+          >
+            <template #extra>
+              <div class="error-actions">
+                <el-button type="primary" plain @click="goDetail">查看订单详情</el-button>
+                <el-button plain @click="$router.push('/order/list')">返回订单列表</el-button>
+              </div>
+            </template>
+          </el-result>
+        </template>
+
         <template v-else-if="needsContractSign">
           <el-result
             icon="warning"
@@ -75,12 +98,23 @@
           </el-result>
         </template>
 
-        <template v-else-if="paymentError">
+        <template v-else-if="shouldSyncExpiredPayment">
           <el-result
             icon="info"
-            title="支付暂不可用"
-            :sub-title="paymentError"
+            title="支付结果确认中"
+            sub-title="订单已到支付截止时间，系统正在确认最终支付结果。你可以手动同步一次。"
           >
+            <template #extra>
+              <div class="error-actions">
+                <el-button type="primary" plain :loading="checking" @click="checkStatus({ manual: true })">立即同步</el-button>
+                <el-button plain @click="goDetail">查看订单详情</el-button>
+              </div>
+            </template>
+          </el-result>
+        </template>
+
+        <template v-else-if="paymentError">
+          <el-result icon="info" title="支付暂不可用" :sub-title="paymentError">
             <template #extra>
               <div class="error-actions">
                 <el-button type="primary" plain @click="refreshPayment">重新尝试</el-button>
@@ -91,6 +125,11 @@
         </template>
 
         <template v-else>
+          <div class="countdown-ribbon">
+            <strong>{{ paymentCountdownText }}</strong>
+            <span>请在 {{ paymentTimeoutMinutes }} 分钟内完成支付，超时订单会自动取消。</span>
+          </div>
+
           <div class="qr-shell">
             <div class="qr-stage">
               <div v-if="payment.qrCodeImage" class="qr-wrap">
@@ -115,24 +154,15 @@
               </div>
               <div class="guide-item">
                 <span>03</span>
-                <p>如果网络慢，也可以手动点“立即同步”确认</p>
+                <p>如果网络稍慢，也可以手动点击“立即同步”确认</p>
               </div>
             </div>
           </div>
 
           <div class="pay-actions">
-            <el-button type="primary" :loading="preparing" @click="refreshPayment">
-              换一张新码
-            </el-button>
-            <el-button plain :disabled="!payment.qrCode" @click="openOnCurrentDevice">
-              当前设备打开支付
-            </el-button>
-            <el-button
-              type="success"
-              plain
-              :loading="checking"
-              @click="checkStatus({ manual: true })"
-            >
+            <el-button type="primary" :loading="preparing" @click="refreshPayment">换一张新码</el-button>
+            <el-button plain :disabled="!payment.qrCode" @click="openOnCurrentDevice">当前设备打开支付</el-button>
+            <el-button type="success" plain :loading="checking" @click="checkStatus({ manual: true })">
               我已支付，立即同步
             </el-button>
           </div>
@@ -163,6 +193,10 @@
             <span>支付单号</span>
             <strong>{{ payment.payNo || paymentStatus.payNo || "-" }}</strong>
           </div>
+          <div class="summary-item">
+            <span>支付截止时间</span>
+            <strong>{{ paymentDeadlineText }}</strong>
+          </div>
         </div>
 
         <div class="summary-actions">
@@ -179,6 +213,13 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { ElMessage } from "element-plus"
 import { api } from "../../api"
+import {
+  formatPaymentCountdown,
+  formatPaymentDeadlineTime,
+  getPaymentRemainingSeconds,
+  isPaymentCountdownActive,
+  isPaymentExpired
+} from "../../utils/paymentDeadline"
 
 const route = useRoute()
 const router = useRouter()
@@ -193,23 +234,43 @@ const qrRenderKey = ref(0)
 const hasRetriedEmptyQr = ref(false)
 const lastStatusSyncAt = ref("")
 const successRedirectSeconds = ref(5)
+const nowMs = ref(Date.now())
 
 let pollTimer = null
 let successCountdownTimer = null
 let successRedirectTimer = null
+let clockTimer = null
+let expiryRefreshLock = false
+let lastExpiryRefreshAt = 0
 
 const order = computed(() => detail.value.order || {})
 const primaryContract = computed(() => (detail.value.contracts || [])[0] || null)
+const paymentTimeoutMinutes = computed(() => Number(order.value.paymentTimeoutMinutes) || 30)
 const isPaid = computed(() => order.value.payStatus === "PAID")
 const needsContractSign = computed(() => order.value.contractStatus !== "SIGNED")
+const isPendingPayment = computed(() => isPaymentCountdownActive(order.value))
+const paymentExpired = computed(() => isPaymentExpired(order.value, nowMs.value))
+const overdueCancelled = computed(() => order.value.orderStatus === "CANCELLED" && paymentExpired.value)
+const shouldSyncExpiredPayment = computed(() => isPendingPayment.value && paymentExpired.value && !isPaid.value)
+const canPreparePayment = computed(() => isPendingPayment.value && !needsContractSign.value && !paymentExpired.value)
 
 const statusTone = computed(() => ({
   success: isPaid.value,
-  warning: needsContractSign.value || paymentError.value
+  warning: !isPaid.value && !overdueCancelled.value,
+  danger: overdueCancelled.value
 }))
+
+const heroTitle = computed(() => {
+  if (isPaid.value) return "支付完成，订单已经确认"
+  if (overdueCancelled.value) return "订单已因超时未支付自动取消"
+  if (shouldSyncExpiredPayment.value) return "支付时限已到，系统正在确认最终支付结果"
+  return `请在 ${paymentTimeoutMinutes.value} 分钟内完成支付`
+})
 
 const statusText = computed(() => {
   if (isPaid.value) return "支付成功"
+  if (overdueCancelled.value) return "已超时取消"
+  if (shouldSyncExpiredPayment.value) return "结果确认中"
   if (needsContractSign.value) return "待签署合同"
   if (paymentError.value) return "支付暂不可用"
   return "等待支付"
@@ -217,18 +278,80 @@ const statusText = computed(() => {
 
 const syncHint = computed(() => {
   if (isPaid.value) return "已确认支付成功"
+  if (overdueCancelled.value) return "订单已自动取消"
+  if (shouldSyncExpiredPayment.value) return "正在确认支付结果"
   if (paymentError.value) return "请先恢复支付"
   return "每 3 秒自动同步一次"
 })
 
-const lastSyncText = computed(() => lastStatusSyncAt.value || "等待首次同步")
+const paymentDeadlineText = computed(() => formatPaymentDeadlineTime(order.value))
+const paymentCountdownText = computed(() => {
+  if (isPaid.value) return "已完成"
+  if (overdueCancelled.value) return "已超时"
+  if (shouldSyncExpiredPayment.value) return "系统处理中"
+  if (!isPendingPayment.value) return "-"
+  return formatPaymentCountdown(getPaymentRemainingSeconds(order.value, nowMs.value))
+})
+const deadlineBoardTone = computed(() => ({
+  warning: canPreparePayment.value,
+  danger: overdueCancelled.value || shouldSyncExpiredPayment.value,
+  info: !canPreparePayment.value && !overdueCancelled.value && !shouldSyncExpiredPayment.value
+}))
+const deadlineDescription = computed(() => {
+  if (overdueCancelled.value) {
+    return "该订单在支付时限内未完成付款，系统已自动取消。"
+  }
+  if (shouldSyncExpiredPayment.value) {
+    return "截止时间已到，系统正在确认最终支付结果，请稍后同步。"
+  }
+  if (canPreparePayment.value) {
+    return `当前剩余支付时间 ${paymentCountdownText.value}，请在 ${paymentTimeoutMinutes.value} 分钟内完成支付，超时后系统会自动取消订单。`
+  }
+  if (needsContractSign.value) {
+    return "请先完成合同签署，签完后会自动回到支付流程。"
+  }
+  return "当前订单无需继续支付。"
+})
 
+const lastSyncText = computed(() => lastStatusSyncAt.value || "等待首次同步")
 const orderStatusLabel = computed(() => mapOrderStatus(order.value.orderStatus))
 const payStatusLabel = computed(() => mapPayStatus(order.value.payStatus))
 const contractStatusLabel = computed(() => mapContractStatus(order.value.contractStatus))
 
 async function loadOrder() {
   detail.value = await api.get(`/orders/${route.params.id}`)
+}
+
+function startClock() {
+  stopClock()
+  clockTimer = window.setInterval(async () => {
+    nowMs.value = Date.now()
+    if (shouldRefreshExpiredOrder()) {
+      lastExpiryRefreshAt = Date.now()
+      expiryRefreshLock = true
+      try {
+        await loadOrder()
+        if (shouldSyncExpiredPayment.value) {
+          await checkStatus()
+        }
+      } finally {
+        expiryRefreshLock = false
+      }
+    }
+  }, 1000)
+}
+
+function stopClock() {
+  if (clockTimer) {
+    window.clearInterval(clockTimer)
+    clockTimer = null
+  }
+}
+
+function shouldRefreshExpiredOrder() {
+  if (expiryRefreshLock) return false
+  if (Date.now() - lastExpiryRefreshAt < 5000) return false
+  return isPendingPayment.value && getPaymentRemainingSeconds(order.value, nowMs.value) <= 0
 }
 
 function bumpQrRender() {
@@ -255,7 +378,7 @@ function markSynced() {
 async function preparePayment(options = {}) {
   const { notify = false, retryOnEmpty = false } = options
   await loadOrder()
-  if (isPaid.value || needsContractSign.value) {
+  if (!canPreparePayment.value) {
     paymentError.value = ""
     return
   }
@@ -281,6 +404,7 @@ async function preparePayment(options = {}) {
   } catch (error) {
     payment.value = {}
     paymentError.value = extractErrorMessage(error)
+    await loadOrder()
     stopPolling()
   } finally {
     preparing.value = false
@@ -290,14 +414,14 @@ async function preparePayment(options = {}) {
 async function refreshPayment() {
   hasRetriedEmptyQr.value = false
   await preparePayment({ notify: true, retryOnEmpty: true })
-  if (!paymentError.value && !pollTimer) {
+  if (!paymentError.value && !pollTimer && (canPreparePayment.value || shouldSyncExpiredPayment.value)) {
     startPolling()
   }
 }
 
 async function checkStatus(options = {}) {
   const { manual = false } = options
-  if (checking.value || isPaid.value || needsContractSign.value || paymentError.value) {
+  if (checking.value || isPaid.value || needsContractSign.value || overdueCancelled.value) {
     return
   }
 
@@ -314,8 +438,20 @@ async function checkStatus(options = {}) {
       return
     }
 
+    if (overdueCancelled.value) {
+      stopPolling()
+      if (manual) {
+        ElMessage.warning("订单已超时未支付，系统已自动取消")
+      }
+      return
+    }
+
     if (manual) {
-      ElMessage.info("暂未确认到支付结果，完成付款后再同步一次就可以。")
+      if (shouldSyncExpiredPayment.value) {
+        ElMessage.info("系统仍在确认支付结果，请稍后再同步一次")
+      } else {
+        ElMessage.info("暂未确认到支付结果，完成付款后再同步一次就可以")
+      }
     }
   } catch (error) {
     if (manual) {
@@ -404,6 +540,7 @@ function extractErrorMessage(error) {
 function mapOrderStatus(status) {
   const textMap = {
     PENDING_PAY: "待支付",
+    PENDING_TRAVEL: "待出行",
     COMPLETED: "已完成",
     CANCELLED: "已取消",
     REFUNDING: "退款中",
@@ -447,6 +584,7 @@ async function initializePage() {
   stopPolling()
   resetPaymentState()
   await loadOrder()
+
   if (isPaid.value) {
     markSynced()
     startSuccessRedirect()
@@ -455,13 +593,22 @@ async function initializePage() {
   if (needsContractSign.value) {
     return
   }
+  if (overdueCancelled.value) {
+    return
+  }
+  if (shouldSyncExpiredPayment.value) {
+    startPolling()
+    return
+  }
+
   await preparePayment({ retryOnEmpty: true })
-  if (!paymentError.value) {
+  if (!paymentError.value && (canPreparePayment.value || shouldSyncExpiredPayment.value)) {
     startPolling()
   }
 }
 
 onMounted(async () => {
+  startClock()
   await initializePage()
 })
 
@@ -486,6 +633,7 @@ watch(
 )
 
 onBeforeUnmount(() => {
+  stopClock()
   stopPolling()
   stopSuccessRedirect()
 })
@@ -521,6 +669,48 @@ onBeforeUnmount(() => {
   margin: 0;
   font-size: clamp(30px, 3vw, 42px);
   line-height: 1.15;
+}
+
+.deadline-board {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+  padding: 18px 20px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.deadline-board.warning {
+  background: rgba(251, 191, 36, 0.18);
+  color: #fef3c7;
+}
+
+.deadline-board.danger {
+  background: rgba(248, 113, 113, 0.16);
+  color: #fee2e2;
+}
+
+.deadline-board.info {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e0f2fe;
+}
+
+.deadline-label {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.78;
+}
+
+.deadline-board strong {
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.deadline-board p {
+  margin: 0;
+  line-height: 1.7;
 }
 
 .flow-strip {
@@ -594,6 +784,11 @@ onBeforeUnmount(() => {
   color: #fef3c7;
 }
 
+.status-pill.danger {
+  background: rgba(248, 113, 113, 0.18);
+  color: #fee2e2;
+}
+
 .hero-metric {
   margin-top: 18px;
   display: grid;
@@ -646,6 +841,27 @@ onBeforeUnmount(() => {
   color: #1d4ed8;
   font-size: 13px;
   font-weight: 600;
+}
+
+.countdown-ribbon {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 18px;
+  padding: 16px 18px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+  border: 1px solid #fdba74;
+}
+
+.countdown-ribbon strong {
+  color: #c2410c;
+  font-size: 28px;
+  line-height: 1.1;
+}
+
+.countdown-ribbon span {
+  color: #9a3412;
+  line-height: 1.7;
 }
 
 .qr-shell {

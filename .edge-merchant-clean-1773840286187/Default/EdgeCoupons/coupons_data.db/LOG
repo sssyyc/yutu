@@ -1,5 +1,0 @@
-2026/03/18-21:24:53.316 ac88 Creating DB D:\bishe\project\.edge-merchant-clean-1773840286187\Default\EdgeCoupons/coupons_data.db since it was missing.
-2026/03/18-21:24:53.327 ac88 Reusing MANIFEST D:\bishe\project\.edge-merchant-clean-1773840286187\Default\EdgeCoupons/coupons_data.db/MANIFEST-000001
-2026/03/18-21:24:53.448 e7a4 Level-0 table #5: started
-2026/03/18-21:24:53.453 e7a4 Level-0 table #5: 681605 bytes OK
-2026/03/18-21:24:53.456 e7a4 Delete type=0 #3
