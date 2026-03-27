@@ -14,14 +14,18 @@ import com.yutu.modules.model.entity.TourContractAppendix;
 import com.yutu.modules.model.entity.TourContractSignature;
 import com.yutu.modules.model.entity.TourOrder;
 import com.yutu.modules.model.entity.TourOrderTraveler;
+import com.yutu.modules.model.entity.TourDepartureDate;
+import com.yutu.modules.model.entity.TourRoute;
 import com.yutu.modules.model.mapper.ContractTemplateMapper;
 import com.yutu.modules.model.mapper.MerchantShopMapper;
 import com.yutu.modules.model.mapper.SysUserMapper;
 import com.yutu.modules.model.mapper.TourContractAppendixMapper;
 import com.yutu.modules.model.mapper.TourContractMapper;
 import com.yutu.modules.model.mapper.TourContractSignatureMapper;
+import com.yutu.modules.model.mapper.TourDepartureDateMapper;
 import com.yutu.modules.model.mapper.TourOrderMapper;
 import com.yutu.modules.model.mapper.TourOrderTravelerMapper;
+import com.yutu.modules.model.mapper.TourRouteMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -50,6 +54,8 @@ public class ContractService {
     private final SysUserMapper sysUserMapper;
     private final TourOrderMapper tourOrderMapper;
     private final TourOrderTravelerMapper tourOrderTravelerMapper;
+    private final TourRouteMapper tourRouteMapper;
+    private final TourDepartureDateMapper tourDepartureDateMapper;
     private final com.yutu.modules.order.service.OrderService orderService;
 
     public ContractService(TourContractMapper tourContractMapper,
@@ -60,6 +66,8 @@ public class ContractService {
                            SysUserMapper sysUserMapper,
                            TourOrderMapper tourOrderMapper,
                            TourOrderTravelerMapper tourOrderTravelerMapper,
+                           TourRouteMapper tourRouteMapper,
+                           TourDepartureDateMapper tourDepartureDateMapper,
                            com.yutu.modules.order.service.OrderService orderService) {
         this.tourContractMapper = tourContractMapper;
         this.tourContractAppendixMapper = tourContractAppendixMapper;
@@ -69,6 +77,8 @@ public class ContractService {
         this.sysUserMapper = sysUserMapper;
         this.tourOrderMapper = tourOrderMapper;
         this.tourOrderTravelerMapper = tourOrderTravelerMapper;
+        this.tourRouteMapper = tourRouteMapper;
+        this.tourDepartureDateMapper = tourDepartureDateMapper;
         this.orderService = orderService;
     }
 
@@ -111,10 +121,25 @@ public class ContractService {
         List<TourOrderTraveler> travelers = loadOrderTravelers(contract.getOrderId());
         List<TourContractSignature> signatures = loadContractSignatures(contract.getId());
         SignProgress progress = buildSignProgress(travelers, signatures);
+        TourOrder order = contract.getOrderId() == null ? null : tourOrderMapper.selectById(contract.getOrderId());
+        TourRoute route = order == null ? null : tourRouteMapper.selectById(order.getRouteId());
+        TourDepartureDate departureDate = order == null ? null : tourDepartureDateMapper.selectById(order.getDepartDateId());
+        SysUser user = sysUserMapper.selectById(contract.getUserId());
+        MerchantShop merchantShop = merchantShopMapper.selectById(contract.getMerchantId());
+        String renderedContent = ContractContentRenderer.render(
+                contract.getContractContent(),
+                contract,
+                order,
+                route,
+                departureDate,
+                user,
+                merchantShop,
+                travelers
+        );
 
         StringBuilder content = new StringBuilder();
         content.append(contract.getContractTitle() == null ? "Contract" : contract.getContractTitle()).append("\n\n");
-        content.append(contract.getContractContent() == null ? "" : contract.getContractContent());
+        content.append(renderedContent == null ? "" : renderedContent);
 
         if (progress.requiredSignCount > 0) {
             content.append("\n\n签署进度\n");
@@ -298,6 +323,20 @@ public class ContractService {
         List<String> travelerNames = extractTravelerNames(travelers);
         SignProgress progress = buildSignProgress(travelers, signatures);
         SysUser signer = sysUserMapper.selectById(contract.getUserId());
+        TourOrder order = contract.getOrderId() == null ? null : tourOrderMapper.selectById(contract.getOrderId());
+        TourRoute route = order == null ? null : tourRouteMapper.selectById(order.getRouteId());
+        TourDepartureDate departureDate = order == null ? null : tourDepartureDateMapper.selectById(order.getDepartDateId());
+        MerchantShop merchantShop = merchantShopMapper.selectById(contract.getMerchantId());
+        contract.setContractContent(ContractContentRenderer.render(
+                contract.getContractContent(),
+                contract,
+                order,
+                route,
+                departureDate,
+                signer,
+                merchantShop,
+                travelers
+        ));
 
         Map<String, Object> map = new HashMap<>();
         map.put("contract", contract);

@@ -6,6 +6,19 @@
     />
 
     <section class="page-card">
+      <div class="toolbar">
+        <el-input
+          v-model="keyword"
+          class="toolbar-search"
+          clearable
+          placeholder="请输入申请人或店铺名称"
+          @clear="load"
+          @keyup.enter="load"
+        />
+        <el-button type="primary" @click="load">查询</el-button>
+        <el-button @click="reset">重置</el-button>
+      </div>
+
       <el-table :data="list" border>
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column label="申请人" min-width="180">
@@ -112,6 +125,7 @@ import AdminPageHero from "../../components/admin/AdminPageHero.vue";
 import { api } from "../../api";
 
 const list = ref([]);
+const keyword = ref("");
 const detailVisible = ref(false);
 const current = ref(null);
 
@@ -134,7 +148,14 @@ function roleText(roleType) {
 }
 
 async function load() {
-  list.value = await api.get("/admin/merchants");
+  const trimmedKeyword = keyword.value.trim();
+  const params = trimmedKeyword ? { keyword: trimmedKeyword } : undefined;
+  list.value = await api.get("/admin/merchants", params);
+}
+
+function reset() {
+  keyword.value = "";
+  load();
 }
 
 function openDetail(row) {
@@ -181,6 +202,20 @@ onMounted(load);
 </script>
 
 <style scoped>
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.toolbar-search {
+  flex: 0 0 360px;
+  width: 360px;
+  max-width: 100%;
+}
+
 .sub-text {
   color: #667085;
   font-size: 12px;

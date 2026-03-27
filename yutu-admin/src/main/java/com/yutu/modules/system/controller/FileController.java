@@ -21,8 +21,10 @@ import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @RestController
@@ -41,7 +43,7 @@ public class FileController {
             throw new BizException(400, "仅支持上传图片文件");
         }
 
-        Path rootPath = Paths.get(uploadDir).toAbsolutePath().normalize();
+        Path rootPath = resolveUploadRoot();
         try {
             Files.createDirectories(rootPath);
             String extension = StringUtils.getFilenameExtension(file.getOriginalFilename());
@@ -66,5 +68,18 @@ public class FileController {
         } catch (IOException e) {
             throw new BizException(500, "图片上传失败");
         }
+    }
+
+    private Path resolveUploadRoot() {
+        Set<Path> candidates = new LinkedHashSet<>();
+        candidates.add(Paths.get(uploadDir).toAbsolutePath().normalize());
+        candidates.add(Paths.get("yutu-admin", uploadDir).toAbsolutePath().normalize());
+
+        for (Path candidate : candidates) {
+            if (Files.exists(candidate)) {
+                return candidate;
+            }
+        }
+        return Paths.get(uploadDir).toAbsolutePath().normalize();
     }
 }

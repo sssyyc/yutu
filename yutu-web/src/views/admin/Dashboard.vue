@@ -40,10 +40,19 @@ function renderChart(el, title, list) {
   const chart = echarts.init(el);
   chart.setOption({
     title: { text: title },
-    tooltip: {},
+    tooltip: {
+      trigger: "axis",
+      valueFormatter: (value) => `${Math.round(Number(value ?? 0))}`
+    },
     xAxis: { type: "category", data: list.map((i) => i.date) },
-    yAxis: { type: "value" },
-    series: [{ type: "line", data: list.map((i) => i.count), smooth: true }]
+    yAxis: {
+      type: "value",
+      minInterval: 1,
+      axisLabel: {
+        formatter: (value) => `${Math.round(Number(value))}`
+      }
+    },
+    series: [{ type: "line", data: list.map((i) => Number(i.count ?? 0)), smooth: false }]
   });
 }
 </script>

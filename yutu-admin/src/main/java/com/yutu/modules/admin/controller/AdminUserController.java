@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -27,8 +28,8 @@ public class AdminUserController {
 
     @PreAuthorize("hasAuthority('admin:user:list')")
     @GetMapping
-    public Result<List<SysUser>> list() {
-        return Result.ok(adminService.users());
+    public Result<List<SysUser>> list(@RequestParam(required = false) String keyword) {
+        return Result.ok(adminService.users(keyword));
     }
 
     @PreAuthorize("hasAuthority('admin:user:status')")

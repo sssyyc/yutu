@@ -77,9 +77,16 @@ public class AdminService {
         this.complaintOrderMapper = complaintOrderMapper;
     }
 
-    public List<SysUser> users() {
-        return sysUserMapper.selectList(new LambdaQueryWrapper<SysUser>()
-                .orderByDesc(SysUser::getCreateTime));
+    public List<SysUser> users(String keyword) {
+        LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<SysUser>()
+                .orderByAsc(SysUser::getId);
+        if (StringUtils.hasText(keyword)) {
+            String trimmedKeyword = keyword.trim();
+            wrapper.and(q -> q.like(SysUser::getUsername, trimmedKeyword)
+                    .or()
+                    .like(SysUser::getNickname, trimmedKeyword));
+        }
+        return sysUserMapper.selectList(wrapper);
     }
 
     public void updateUserStatus(Long id, Integer status) {
@@ -100,9 +107,9 @@ public class AdminService {
         sysUserMapper.updateById(user);
     }
 
-    public List<AdminMerchantVO> merchants() {
+    public List<AdminMerchantVO> merchants(String keyword) {
         List<MerchantShop> merchants = merchantShopMapper.selectList(new LambdaQueryWrapper<MerchantShop>()
-                .orderByDesc(MerchantShop::getCreateTime));
+                .orderByAsc(MerchantShop::getId));
         List<Long> userIds = merchants.stream()
                 .map(MerchantShop::getUserId)
                 .distinct()
@@ -112,7 +119,7 @@ public class AdminService {
                 : sysUserMapper.selectBatchIds(userIds).stream()
                 .collect(Collectors.toMap(SysUser::getId, user -> user, (a, b) -> a));
 
-        return merchants.stream().map(shop -> {
+        List<AdminMerchantVO> result = merchants.stream().map(shop -> {
             AdminMerchantVO vo = new AdminMerchantVO();
             BeanUtils.copyProperties(shop, vo);
             SysUser user = userMap.get(shop.getUserId());
@@ -124,6 +131,16 @@ public class AdminService {
             }
             return vo;
         }).collect(Collectors.toList());
+
+        if (!StringUtils.hasText(keyword)) {
+            return result;
+        }
+        String trimmedKeyword = keyword.trim();
+        return result.stream()
+                .filter(item -> containsKeyword(item.getApplicantUsername(), trimmedKeyword)
+                        || containsKeyword(item.getApplicantNickname(), trimmedKeyword)
+                        || containsKeyword(item.getShopName(), trimmedKeyword))
+                .collect(Collectors.toList());
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -144,9 +161,13 @@ public class AdminService {
         }
     }
 
-    public List<TourCategory> categories() {
-        return tourCategoryMapper.selectList(new LambdaQueryWrapper<TourCategory>()
-                .orderByAsc(TourCategory::getSortNum));
+    public List<TourCategory> categories(String keyword) {
+        LambdaQueryWrapper<TourCategory> wrapper = new LambdaQueryWrapper<TourCategory>()
+                .orderByAsc(TourCategory::getSortNum);
+        if (StringUtils.hasText(keyword)) {
+            wrapper.like(TourCategory::getCategoryName, keyword.trim());
+        }
+        return tourCategoryMapper.selectList(wrapper);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -177,9 +198,16 @@ public class AdminService {
         tourCategoryMapper.deleteById(id);
     }
 
-    public List<TourTag> tags() {
-        return tourTagMapper.selectList(new LambdaQueryWrapper<TourTag>()
-                .orderByDesc(TourTag::getUpdateTime));
+    public List<TourTag> tags(String keyword) {
+        LambdaQueryWrapper<TourTag> wrapper = new LambdaQueryWrapper<TourTag>()
+                .orderByDesc(TourTag::getUpdateTime);
+        if (StringUtils.hasText(keyword)) {
+            String trimmedKeyword = keyword.trim();
+            wrapper.and(q -> q.like(TourTag::getTagName, trimmedKeyword)
+                    .or()
+                    .like(TourTag::getTagType, trimmedKeyword));
+        }
+        return tourTagMapper.selectList(wrapper);
     }
 
     public Long createTag(TagSaveRequest request) {
@@ -207,9 +235,13 @@ public class AdminService {
         tourTagMapper.deleteById(id);
     }
 
-    public List<TourRoute> routes() {
-        return tourRouteMapper.selectList(new LambdaQueryWrapper<TourRoute>()
-                .orderByDesc(TourRoute::getUpdateTime));
+    public List<TourRoute> routes(String keyword) {
+        LambdaQueryWrapper<TourRoute> wrapper = new LambdaQueryWrapper<TourRoute>()
+                .orderByAsc(TourRoute::getId);
+        if (StringUtils.hasText(keyword)) {
+            wrapper.like(TourRoute::getRouteName, keyword.trim());
+        }
+        return tourRouteMapper.selectList(wrapper);
     }
 
     public List<TourDepartureDate> routeDepartureDatesByRoute(Long routeId) {
@@ -226,8 +258,7 @@ public class AdminService {
     public List<AdminRouteDepartureDateVO> routeDepartureDates() {
         List<TourDepartureDate> departureDates = tourDepartureDateMapper.selectList(new LambdaQueryWrapper<TourDepartureDate>()
                 .eq(TourDepartureDate::getStatus, 1)
-                .orderByAsc(TourDepartureDate::getAuditStatus)
-                .orderByDesc(TourDepartureDate::getUpdateTime));
+                .orderByAsc(TourDepartureDate::getId));
         if (departureDates.isEmpty()) {
             return new ArrayList<>();
         }
@@ -834,6 +865,10 @@ public class AdminService {
 
     private String defaultIfBlank(String value, String defaultValue) {
         return StringUtils.hasText(value) ? value : defaultValue;
+    }
+
+    private boolean containsKeyword(String source, String keyword) {
+        return StringUtils.hasText(source) && source.contains(keyword);
     }
 
     @SuppressWarnings("unchecked")

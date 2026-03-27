@@ -108,7 +108,10 @@ function renderLineChart(el, name, list, color) {
   const chart = echarts.init(el);
   chart.setOption({
     color: [color],
-    tooltip: { trigger: "axis" },
+    tooltip: {
+      trigger: "axis",
+      valueFormatter: (value) => `${Math.round(Number(value ?? 0))}`
+    },
     grid: { left: 40, right: 20, top: 36, bottom: 30 },
     xAxis: {
       type: "category",
@@ -118,15 +121,19 @@ function renderLineChart(el, name, list, color) {
     },
     yAxis: {
       type: "value",
+      minInterval: 1,
       splitLine: { lineStyle: { color: "#e2e8f0" } },
-      axisLabel: { color: "#64748b" }
+      axisLabel: {
+        color: "#64748b",
+        formatter: (value) => `${Math.round(Number(value))}`
+      }
     },
     series: [
       {
         name,
         type: "line",
-        smooth: true,
-        data: list.map((item) => item.count),
+        smooth: false,
+        data: list.map((item) => Number(item.count ?? 0)),
         areaStyle: { opacity: 0.12 }
       }
     ]

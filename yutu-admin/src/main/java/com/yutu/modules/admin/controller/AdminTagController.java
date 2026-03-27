@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -28,8 +29,8 @@ public class AdminTagController {
 
     @PreAuthorize("hasAuthority('admin:tag:list')")
     @GetMapping
-    public Result<List<TourTag>> list() {
-        return Result.ok(adminService.tags());
+    public Result<List<TourTag>> list(@RequestParam(required = false) String keyword) {
+        return Result.ok(adminService.tags(keyword));
     }
 
     @PreAuthorize("hasAuthority('admin:tag:manage')")

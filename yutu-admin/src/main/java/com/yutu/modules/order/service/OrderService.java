@@ -6,6 +6,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yutu.common.context.UserContext;
 import com.yutu.common.exception.BizException;
+import com.yutu.modules.contract.service.ContractContentRenderer;
 import com.yutu.modules.model.entity.ContractTemplate;
 import com.yutu.modules.model.entity.MerchantShop;
 import com.yutu.modules.model.entity.PayRecord;
@@ -14,9 +15,11 @@ import com.yutu.modules.model.entity.TourDepartureDate;
 import com.yutu.modules.model.entity.TourOrder;
 import com.yutu.modules.model.entity.TourOrderTraveler;
 import com.yutu.modules.model.entity.TourRoute;
+import com.yutu.modules.model.entity.SysUser;
 import com.yutu.modules.model.mapper.ContractTemplateMapper;
 import com.yutu.modules.model.mapper.MerchantShopMapper;
 import com.yutu.modules.model.mapper.PayRecordMapper;
+import com.yutu.modules.model.mapper.SysUserMapper;
 import com.yutu.modules.model.mapper.TourContractMapper;
 import com.yutu.modules.model.mapper.TourDepartureDateMapper;
 import com.yutu.modules.model.mapper.TourOrderMapper;
@@ -58,6 +61,7 @@ public class OrderService {
     private final ContractTemplateMapper contractTemplateMapper;
     private final TourContractMapper tourContractMapper;
     private final MerchantShopMapper merchantShopMapper;
+    private final SysUserMapper sysUserMapper;
     private final AlipaySandboxService alipaySandboxService;
     private final ObjectMapper objectMapper;
     private final long paymentTimeoutMinutes;
@@ -70,6 +74,7 @@ public class OrderService {
             ContractTemplateMapper contractTemplateMapper,
             TourContractMapper tourContractMapper,
             MerchantShopMapper merchantShopMapper,
+            SysUserMapper sysUserMapper,
             AlipaySandboxService alipaySandboxService,
             ObjectMapper objectMapper,
             @Value("${app.order.payment-timeout-minutes:30}") long paymentTimeoutMinutes) {
@@ -81,6 +86,7 @@ public class OrderService {
         this.contractTemplateMapper = contractTemplateMapper;
         this.tourContractMapper = tourContractMapper;
         this.merchantShopMapper = merchantShopMapper;
+        this.sysUserMapper = sysUserMapper;
         this.alipaySandboxService = alipaySandboxService;
         this.objectMapper = objectMapper;
         this.paymentTimeoutMinutes = paymentTimeoutMinutes;
@@ -327,7 +333,24 @@ public class OrderService {
         contract.setUserId(order.getUserId());
         contract.setMerchantId(order.getMerchantId());
         contract.setContractTitle("豫途旅游服务合同 " + order.getOrderNo());
-        contract.setContractContent(template.getTemplateContent());
+        List<TourOrderTraveler> travelers = tourOrderTravelerMapper.selectList(new LambdaQueryWrapper<TourOrderTraveler>()
+                .eq(TourOrderTraveler::getOrderId, order.getId())
+                .orderByAsc(TourOrderTraveler::getCreateTime)
+                .orderByAsc(TourOrderTraveler::getId));
+        SysUser user = sysUserMapper.selectById(order.getUserId());
+        MerchantShop merchantShop = merchantShopMapper.selectById(order.getMerchantId());
+        TourRoute route = tourRouteMapper.selectById(order.getRouteId());
+        TourDepartureDate departureDate = tourDepartureDateMapper.selectById(order.getDepartDateId());
+        contract.setContractContent(ContractContentRenderer.render(
+                template.getTemplateContent(),
+                contract,
+                order,
+                route,
+                departureDate,
+                user,
+                merchantShop,
+                travelers
+        ));
         contract.setSignStatus("UNSIGNED");
         contract.setDeleted(0);
         tourContractMapper.insert(contract);

@@ -7,7 +7,18 @@
 
     <section class="page-card">
       <div class="toolbar">
-        <div class="toolbar-tip">当前共 {{ list.length }} 个标签</div>
+        <div class="toolbar-left">
+          <el-input
+            v-model="keyword"
+            class="toolbar-search"
+            clearable
+            placeholder="请输入标签名称或类型"
+            @clear="load"
+            @keyup.enter="load"
+          />
+          <el-button type="primary" @click="load">查询</el-button>
+          <el-button @click="resetSearch">重置</el-button>
+        </div>
         <div class="toolbar-actions">
           <el-button type="primary" @click="openCreateDialog">新增标签</el-button>
           <el-button @click="load">刷新</el-button>
@@ -15,17 +26,17 @@
       </div>
 
       <el-table :data="list" border class="resource-table">
-        <el-table-column prop="id" label="ID" width="90" />
-        <el-table-column prop="tagName" label="标签名称" min-width="220" />
+        <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column prop="tagName" label="标签名称" min-width="320" />
         <el-table-column prop="tagType" label="标签类型" min-width="220" />
-        <el-table-column label="状态" width="120">
+        <el-table-column label="状态" width="110">
           <template #default="{ row }">
             <el-tag :type="row.status === 1 ? 'success' : 'info'">
               {{ row.status === 1 ? "启用" : "停用" }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="180" fixed="right">
+        <el-table-column label="操作" width="160" fixed="right">
           <template #default="{ row }">
             <el-button text type="primary" @click="openEditDialog(row)">编辑</el-button>
             <el-button text type="danger" @click="remove(row.id)">删除</el-button>
@@ -39,7 +50,7 @@
       :title="form.id ? '编辑标签' : '新增标签'"
       width="560px"
       destroy-on-close
-      @closed="reset"
+      @closed="resetForm"
     >
       <el-form :model="form" label-width="92px">
         <el-form-item label="标签名称">
@@ -72,6 +83,7 @@ import AdminPageHero from "../../components/admin/AdminPageHero.vue";
 import { api } from "../../api";
 
 const list = ref([]);
+const keyword = ref("");
 const dialogVisible = ref(false);
 const form = reactive({
   id: null,
@@ -81,21 +93,23 @@ const form = reactive({
 });
 
 async function load() {
-  list.value = await api.get("/admin/tags");
+  const trimmedKeyword = keyword.value.trim();
+  const params = trimmedKeyword ? { keyword: trimmedKeyword } : undefined;
+  list.value = await api.get("/admin/tags", params);
 }
 
 function openCreateDialog() {
-  reset();
+  resetForm();
   dialogVisible.value = true;
 }
 
 function openEditDialog(row) {
-  reset();
+  resetForm();
   Object.assign(form, row);
   dialogVisible.value = true;
 }
 
-function reset() {
+function resetForm() {
   Object.assign(form, {
     id: null,
     tagName: "",
@@ -111,13 +125,18 @@ async function save() {
     await api.post("/admin/tags", form);
   }
   dialogVisible.value = false;
-  reset();
+  resetForm();
   await load();
 }
 
 async function remove(id) {
   await api.del(`/admin/tags/${id}`);
   await load();
+}
+
+function resetSearch() {
+  keyword.value = "";
+  load();
 }
 
 onMounted(load);
@@ -133,13 +152,21 @@ onMounted(load);
   flex-wrap: wrap;
 }
 
-.toolbar-tip {
-  color: #64748b;
-  font-size: 14px;
+.toolbar-left,
+.dialog-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-.toolbar-actions,
-.dialog-actions {
+.toolbar-search {
+  flex: 0 0 360px;
+  width: 360px;
+  max-width: 100%;
+}
+
+.toolbar-actions {
   display: flex;
   gap: 12px;
 }

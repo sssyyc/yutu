@@ -443,14 +443,26 @@ function renderMerchantCharts() {
   createChart("merchantTrend", merchantTrendRef.value, {
     tooltip: { trigger: "axis" },
     xAxis: { type: "category", data: settlementTrend.map((i) => i.date) },
-    yAxis: { type: "value" },
+    yAxis: {
+      type: "value",
+      minInterval: 1,
+      axisLabel: {
+        formatter: (value) => `${Math.round(Number(value))}`
+      }
+    },
     series: [{ type: "line", smooth: true, areaStyle: {}, data: settlementTrend.map((i) => Number(i.count || 0)) }]
   });
 
   createChart("merchantActive", merchantActiveRef.value, {
     tooltip: { trigger: "axis" },
     xAxis: { type: "category", data: activeTrend.map((i) => i.date) },
-    yAxis: { type: "value" },
+    yAxis: {
+      type: "value",
+      minInterval: 1,
+      axisLabel: {
+        formatter: (value) => `${Math.round(Number(value))}`
+      }
+    },
     series: [{ type: "line", smooth: true, areaStyle: {}, data: activeTrend.map((i) => Number(i.count || 0)) }]
   });
 
@@ -465,7 +477,13 @@ function renderMerchantCharts() {
   createChart("merchantComplaintRank", merchantComplaintRankRef.value, {
     tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
     grid: { left: 24, right: 24, top: 20, bottom: 36, containLabel: true },
-    xAxis: { type: "value" },
+    xAxis: {
+      type: "value",
+      minInterval: 1,
+      axisLabel: {
+        formatter: (value) => `${Math.round(Number(value))}`
+      }
+    },
     yAxis: { type: "category", data: complaintRank.map((i) => i.merchantName) },
     series: [{ type: "bar", data: complaintRank.map((i) => Number(i.complaintCount || 0)), barWidth: 16 }]
   });
@@ -479,7 +497,13 @@ function renderCustomerCharts() {
   createChart("customerRegisterTrend", customerRegisterTrendRef.value, {
     tooltip: { trigger: "axis" },
     xAxis: { type: "category", data: registerTrend.map((i) => i.date) },
-    yAxis: { type: "value" },
+    yAxis: {
+      type: "value",
+      minInterval: 1,
+      axisLabel: {
+        formatter: (value) => `${Math.round(Number(value))}`
+      }
+    },
     series: [{ type: "line", smooth: true, areaStyle: {}, data: registerTrend.map((i) => Number(i.count || 0)) }]
   });
 
@@ -493,7 +517,13 @@ function renderCustomerCharts() {
     tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
     grid: { left: 24, right: 24, top: 20, bottom: 36, containLabel: true },
     xAxis: { type: "category", data: preferenceRank.map((i) => i.categoryName) },
-    yAxis: { type: "value" },
+    yAxis: {
+      type: "value",
+      minInterval: 1,
+      axisLabel: {
+        formatter: (value) => `${Math.round(Number(value))}`
+      }
+    },
     series: [{ type: "bar", data: preferenceRank.map((i) => Number(i.orderCount || 0)), barWidth: 24 }]
   });
 }
@@ -509,7 +539,17 @@ function renderPlatformCharts() {
     legend: { data: ["订单量", "交易额"] },
     grid: { left: 24, right: 36, top: 40, bottom: 36, containLabel: true },
     xAxis: { type: "category", data: orderTrend.map((i) => i.date) },
-    yAxis: [{ type: "value", name: "订单量" }, { type: "value", name: "交易额" }],
+    yAxis: [
+      {
+        type: "value",
+        name: "订单量",
+        minInterval: 1,
+        axisLabel: {
+          formatter: (value) => `${Math.round(Number(value))}`
+        }
+      },
+      { type: "value", name: "交易额" }
+    ],
     series: [
       { name: "订单量", type: "bar", data: orderTrend.map((i) => Number(i.count || 0)), barWidth: 14 },
       { name: "交易额", type: "line", yAxisIndex: 1, smooth: true, data: turnoverTrend.map((i) => Number(i.amount || 0)) }

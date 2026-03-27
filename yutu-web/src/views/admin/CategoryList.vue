@@ -7,7 +7,18 @@
 
     <section class="page-card">
       <div class="toolbar">
-        <div class="toolbar-tip">当前共 {{ list.length }} 个形式</div>
+        <div class="toolbar-left">
+          <el-input
+            v-model="keyword"
+            class="toolbar-search"
+            clearable
+            placeholder="请输入形式名称"
+            @clear="load"
+            @keyup.enter="load"
+          />
+          <el-button type="primary" @click="load">查询</el-button>
+          <el-button @click="resetSearch">重置</el-button>
+        </div>
         <div class="toolbar-actions">
           <el-button type="primary" @click="openCreateDialog">新增形式</el-button>
           <el-button @click="load">刷新</el-button>
@@ -39,7 +50,7 @@
       :title="form.id ? '编辑形式' : '新增形式'"
       width="560px"
       destroy-on-close
-      @closed="reset"
+      @closed="resetForm"
     >
       <el-form :model="form" label-width="92px">
         <el-form-item label="形式名称">
@@ -72,6 +83,7 @@ import AdminPageHero from "../../components/admin/AdminPageHero.vue";
 import { api } from "../../api";
 
 const list = ref([]);
+const keyword = ref("");
 const dialogVisible = ref(false);
 const form = reactive({
   id: null,
@@ -82,21 +94,23 @@ const form = reactive({
 });
 
 async function load() {
-  list.value = await api.get("/admin/categories");
+  const trimmedKeyword = keyword.value.trim();
+  const params = trimmedKeyword ? { keyword: trimmedKeyword } : undefined;
+  list.value = await api.get("/admin/categories", params);
 }
 
 function openCreateDialog() {
-  reset();
+  resetForm();
   dialogVisible.value = true;
 }
 
 function openEditDialog(row) {
-  reset();
+  resetForm();
   Object.assign(form, row);
   dialogVisible.value = true;
 }
 
-function reset() {
+function resetForm() {
   Object.assign(form, {
     id: null,
     categoryName: "",
@@ -118,13 +132,18 @@ async function save() {
     await api.post("/admin/categories", payload);
   }
   dialogVisible.value = false;
-  reset();
+  resetForm();
   await load();
 }
 
 async function remove(id) {
   await api.del(`/admin/categories/${id}`);
   await load();
+}
+
+function resetSearch() {
+  keyword.value = "";
+  load();
 }
 
 onMounted(load);
@@ -140,13 +159,21 @@ onMounted(load);
   flex-wrap: wrap;
 }
 
-.toolbar-tip {
-  color: #64748b;
-  font-size: 14px;
+.toolbar-left,
+.dialog-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-.toolbar-actions,
-.dialog-actions {
+.toolbar-search {
+  flex: 0 0 360px;
+  width: 360px;
+  max-width: 100%;
+}
+
+.toolbar-actions {
   display: flex;
   gap: 12px;
 }

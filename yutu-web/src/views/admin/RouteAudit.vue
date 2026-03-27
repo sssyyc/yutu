@@ -8,6 +8,21 @@
     <section class="page-card">
       <el-tabs v-model="activeTab" class="audit-tabs">
         <el-tab-pane label="路线资料审核" name="route">
+          <div class="route-toolbar">
+            <div class="toolbar-left">
+              <el-input
+                v-model="keyword"
+                class="toolbar-search"
+                clearable
+                placeholder="请输入线路名称"
+                @clear="load"
+                @keyup.enter="load"
+              />
+              <el-button type="primary" @click="load">查询</el-button>
+              <el-button @click="resetSearch">重置</el-button>
+            </div>
+          </div>
+
           <el-table :data="routeList" border>
             <el-table-column prop="id" label="ID" width="80" />
             <el-table-column label="路线名称" min-width="220">
@@ -92,11 +107,13 @@
                 {{ row.auditRemark || "-" }}
               </template>
             </el-table-column>
-            <el-table-column label="操作" min-width="200" fixed="right">
+            <el-table-column label="操作" width="260" fixed="right">
               <template #default="{ row }">
-                <el-button text type="primary" @click="showDetail(row.routeId)">查看路线</el-button>
-                <el-button text type="success" @click="approveDeparture(row.id)">通过</el-button>
-                <el-button text type="danger" @click="rejectDeparture(row)">驳回</el-button>
+                <div class="action-row">
+                  <el-button text type="primary" @click="showDetail(row.routeId)">查看路线</el-button>
+                  <el-button text type="success" @click="approveDeparture(row.id)">通过</el-button>
+                  <el-button text type="danger" @click="rejectDeparture(row)">驳回</el-button>
+                </div>
               </template>
             </el-table-column>
           </el-table>
@@ -165,7 +182,9 @@ import { api } from "../../api";
 import { parseRouteDetailContent } from "../../utils/routeDetailMeta";
 
 const activeTab = ref("route");
+const keyword = ref("");
 const routeList = ref([]);
+const allRouteList = ref([]);
 const departureList = ref([]);
 const selectedDepartureRouteId = ref(null);
 const detailVisible = ref(false);
@@ -204,16 +223,19 @@ function formatPrice(value) {
 }
 
 async function load() {
-  const [routes, departureDates] = await Promise.all([
+  const trimmedKeyword = keyword.value.trim();
+  const [allRoutes, routes, departureDates] = await Promise.all([
     api.get("/admin/routes"),
+    api.get("/admin/routes", trimmedKeyword ? { keyword: trimmedKeyword } : undefined),
     api.get("/admin/routes/departure-dates")
   ]);
+  allRouteList.value = allRoutes;
   routeList.value = routes;
   departureList.value = departureDates;
 }
 
 async function showDetail(routeId) {
-  const found = routeList.value.find((item) => Number(item.id) === Number(routeId));
+  const found = allRouteList.value.find((item) => Number(item.id) === Number(routeId));
   if (!found) {
     ElMessage.warning("未找到路线详情");
     return;
@@ -291,12 +313,34 @@ async function rejectDeparture(row) {
   }
 }
 
+function resetSearch() {
+  keyword.value = "";
+  load();
+}
+
 onMounted(load);
 </script>
 
 <style scoped>
 .audit-tabs :deep(.el-tabs__header) {
   margin-bottom: 18px;
+}
+
+.route-toolbar {
+  margin-bottom: 14px;
+}
+
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.toolbar-search {
+  flex: 0 0 360px;
+  width: 360px;
+  max-width: 100%;
 }
 
 .departure-toolbar {
@@ -320,6 +364,14 @@ onMounted(load);
 .route-link {
   padding: 0;
   font-weight: 600;
+}
+
+.action-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
 }
 
 .detail-cover {

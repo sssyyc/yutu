@@ -6,6 +6,19 @@
     />
 
     <section class="page-card">
+      <div class="toolbar">
+        <el-input
+          v-model="keyword"
+          class="toolbar-search"
+          clearable
+          placeholder="请输入用户名或昵称"
+          @clear="load"
+          @keyup.enter="load"
+        />
+        <el-button type="primary" @click="load">查询</el-button>
+        <el-button @click="reset">重置</el-button>
+      </div>
+
       <el-table :data="list" border>
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="username" label="用户名" min-width="180" />
@@ -40,6 +53,7 @@ import AdminPageHero from "../../components/admin/AdminPageHero.vue";
 import { api } from "../../api";
 
 const list = ref([]);
+const keyword = ref("");
 
 function roleText(roleType) {
   const map = {
@@ -51,7 +65,9 @@ function roleText(roleType) {
 }
 
 async function load() {
-  list.value = await api.get("/admin/users");
+  const trimmedKeyword = keyword.value.trim();
+  const params = trimmedKeyword ? { keyword: trimmedKeyword } : undefined;
+  list.value = await api.get("/admin/users", params);
 }
 
 async function setStatus(id, status) {
@@ -64,5 +80,24 @@ async function remove(id) {
   await load();
 }
 
+function reset() {
+  keyword.value = "";
+  load();
+}
+
 onMounted(load);
 </script>
+
+<style scoped>
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.toolbar-search {
+  width: min(360px, 100%);
+}
+</style>
