@@ -4,6 +4,7 @@ import com.yutu.common.result.Result;
 import com.yutu.modules.merchant.dto.MerchantRouteDatesSaveRequest;
 import com.yutu.modules.merchant.dto.MerchantRouteSaveRequest;
 import com.yutu.modules.merchant.service.MerchantService;
+import com.yutu.modules.merchant.vo.MerchantRouteDepartureDateVO;
 import com.yutu.modules.model.entity.TourDepartureDate;
 import com.yutu.modules.model.entity.TourRoute;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -44,6 +45,12 @@ public class MerchantRouteController {
     @GetMapping
     public Result<List<TourRoute>> list() {
         return Result.ok(merchantService.routeList());
+    }
+
+    @PreAuthorize("hasAuthority('merchant:route:list')")
+    @GetMapping("/departure-dates")
+    public Result<List<MerchantRouteDepartureDateVO>> departureDates() {
+        return Result.ok(merchantService.routeDepartureDates());
     }
 
     @PreAuthorize("hasAuthority('merchant:route:list')")

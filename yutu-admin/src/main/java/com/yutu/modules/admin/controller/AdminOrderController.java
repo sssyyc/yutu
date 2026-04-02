@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -24,14 +25,14 @@ public class AdminOrderController {
 
     @PreAuthorize("hasAuthority('admin:order:list')")
     @GetMapping("/orders")
-    public Result<List<TourOrder>> orders() {
-        return Result.ok(orderService.adminOrders());
+    public Result<List<TourOrder>> orders(@RequestParam(required = false) String keyword) {
+        return Result.ok(orderService.adminOrders(keyword));
     }
 
     @PreAuthorize("hasAuthority('admin:pay:list')")
     @GetMapping("/pay-records")
-    public Result<List<PayRecord>> payRecords() {
-        return Result.ok(orderService.adminPayRecords());
+    public Result<List<PayRecord>> payRecords(@RequestParam(required = false) String keyword) {
+        return Result.ok(orderService.adminPayRecords(keyword));
     }
 
     @PreAuthorize("hasAuthority('admin:order:handle')")

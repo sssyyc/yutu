@@ -5,6 +5,7 @@ import com.yutu.modules.merchant.service.MerchantService;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -21,7 +22,7 @@ public class MerchantCustomerController {
 
     @PreAuthorize("hasAuthority('merchant:customer:list')")
     @GetMapping
-    public Result<List<Map<String, Object>>> list() {
-        return Result.ok(merchantService.customers());
+    public Result<List<Map<String, Object>>> list(@RequestParam(required = false) String keyword) {
+        return Result.ok(merchantService.customers(keyword));
     }
 }

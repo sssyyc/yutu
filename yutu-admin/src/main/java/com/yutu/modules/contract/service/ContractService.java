@@ -29,6 +29,7 @@ import com.yutu.modules.model.mapper.TourRouteMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -243,11 +244,18 @@ public class ContractService {
         }
     }
 
-    public List<TourContract> merchantContracts() {
+    public List<TourContract> merchantContracts(String keyword) {
         Long shopId = currentMerchantShopId();
-        return tourContractMapper.selectList(new LambdaQueryWrapper<TourContract>()
+        LambdaQueryWrapper<TourContract> wrapper = new LambdaQueryWrapper<TourContract>()
                 .eq(TourContract::getMerchantId, shopId)
-                .orderByDesc(TourContract::getCreateTime));
+                .orderByDesc(TourContract::getCreateTime);
+        if (StringUtils.hasText(keyword)) {
+            String trimmedKeyword = keyword.trim();
+            wrapper.and(q -> q.like(TourContract::getContractNo, trimmedKeyword)
+                    .or()
+                    .like(TourContract::getContractTitle, trimmedKeyword));
+        }
+        return tourContractMapper.selectList(wrapper);
     }
 
     public Map<String, Object> merchantContractDetail(Long id) {
@@ -272,9 +280,16 @@ public class ContractService {
         return appendix.getId();
     }
 
-    public List<ContractTemplate> adminTemplateList() {
-        return contractTemplateMapper.selectList(new LambdaQueryWrapper<ContractTemplate>()
-                .orderByDesc(ContractTemplate::getUpdateTime));
+    public List<ContractTemplate> adminTemplateList(String keyword) {
+        LambdaQueryWrapper<ContractTemplate> wrapper = new LambdaQueryWrapper<ContractTemplate>()
+                .orderByDesc(ContractTemplate::getUpdateTime);
+        if (StringUtils.hasText(keyword)) {
+            String trimmedKeyword = keyword.trim();
+            wrapper.and(q -> q.like(ContractTemplate::getTemplateName, trimmedKeyword)
+                    .or()
+                    .like(ContractTemplate::getTemplateCode, trimmedKeyword));
+        }
+        return contractTemplateMapper.selectList(wrapper);
     }
 
     public Long adminCreateTemplate(ContractTemplateSaveRequest request) {

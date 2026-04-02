@@ -1,9 +1,6 @@
 <template>
   <div class="admin-module-page">
-    <AdminPageHero
-      kicker="ROUTE AUDIT"
-      title="路线审核"
-    />
+    <AdminPageHero kicker="ROUTE AUDIT" title="路线审核" />
 
     <section class="page-card">
       <el-tabs v-model="activeTab" class="audit-tabs">
@@ -21,6 +18,7 @@
               <el-button type="primary" @click="load">查询</el-button>
               <el-button @click="resetSearch">重置</el-button>
             </div>
+            <div class="toolbar-tip">当前展示 {{ routeList.length }} 条路线记录</div>
           </div>
 
           <el-table :data="routeList" border>
@@ -35,12 +33,16 @@
             <el-table-column prop="summary" label="路线概述" min-width="220" show-overflow-tooltip />
             <el-table-column label="路线审核" width="140">
               <template #default="{ row }">
-                <el-tag :type="auditTag(row.auditStatus).type">{{ auditTag(row.auditStatus).text }}</el-tag>
+                <el-tag :type="auditTag(row.auditStatus).type" effect="light" round>
+                  {{ auditTag(row.auditStatus).text }}
+                </el-tag>
               </template>
             </el-table-column>
             <el-table-column label="上架状态" width="140">
               <template #default="{ row }">
-                <el-tag :type="publishTag(row.publishStatus).type">{{ publishTag(row.publishStatus).text }}</el-tag>
+                <el-tag :type="publishTag(row.publishStatus).type" effect="light" round>
+                  {{ publishTag(row.publishStatus).text }}
+                </el-tag>
               </template>
             </el-table-column>
             <el-table-column label="审核说明" min-width="220" show-overflow-tooltip>
@@ -89,17 +91,21 @@
             </el-table-column>
             <el-table-column prop="departDate" label="出发日期" min-width="150" />
             <el-table-column label="售价" width="120">
-              <template #default="{ row }">¥ {{ formatPrice(row.salePrice) }}</template>
+              <template #default="{ row }">￥ {{ formatPrice(row.salePrice) }}</template>
             </el-table-column>
             <el-table-column prop="remainCount" label="余量" width="100" />
             <el-table-column label="路线审核" width="120">
               <template #default="{ row }">
-                <el-tag :type="auditTag(row.routeAuditStatus).type">{{ auditTag(row.routeAuditStatus).text }}</el-tag>
+                <el-tag :type="auditTag(row.routeAuditStatus).type" effect="light" round>
+                  {{ auditTag(row.routeAuditStatus).text }}
+                </el-tag>
               </template>
             </el-table-column>
             <el-table-column label="日期审核" width="120">
               <template #default="{ row }">
-                <el-tag :type="auditTag(row.auditStatus).type">{{ auditTag(row.auditStatus).text }}</el-tag>
+                <el-tag :type="auditTag(row.auditStatus).type" effect="light" round>
+                  {{ auditTag(row.auditStatus).text }}
+                </el-tag>
               </template>
             </el-table-column>
             <el-table-column label="审核说明" min-width="220" show-overflow-tooltip>
@@ -123,7 +129,7 @@
 
     <el-dialog v-model="detailVisible" title="路线详情" width="920px" destroy-on-close>
       <template v-if="currentRoute">
-        <div class="detail-cover" v-if="currentRoute.coverImage">
+        <div v-if="currentRoute.coverImage" class="detail-cover">
           <el-image
             :src="currentRoute.coverImage"
             fit="cover"
@@ -135,14 +141,18 @@
 
         <el-descriptions :column="2" border class="detail-descriptions">
           <el-descriptions-item label="路线名称">{{ currentRoute.routeName || "-" }}</el-descriptions-item>
-          <el-descriptions-item label="价格">¥ {{ formatPrice(currentRoute.price) }}</el-descriptions-item>
+          <el-descriptions-item label="价格">￥ {{ formatPrice(currentRoute.price) }}</el-descriptions-item>
           <el-descriptions-item label="库存">{{ currentRoute.stock ?? "-" }}</el-descriptions-item>
           <el-descriptions-item label="评分">{{ currentRoute.score ?? "-" }}</el-descriptions-item>
           <el-descriptions-item label="路线审核">
-            <el-tag :type="auditTag(currentRoute.auditStatus).type">{{ auditTag(currentRoute.auditStatus).text }}</el-tag>
+            <el-tag :type="auditTag(currentRoute.auditStatus).type" effect="light" round>
+              {{ auditTag(currentRoute.auditStatus).text }}
+            </el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="上架状态">
-            <el-tag :type="publishTag(currentRoute.publishStatus).type">{{ publishTag(currentRoute.publishStatus).text }}</el-tag>
+            <el-tag :type="publishTag(currentRoute.publishStatus).type" effect="light" round>
+              {{ publishTag(currentRoute.publishStatus).text }}
+            </el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="路线概述" :span="2">{{ currentRoute.summary || "-" }}</el-descriptions-item>
           <el-descriptions-item label="详细介绍" :span="2">{{ currentPlainDetail || "-" }}</el-descriptions-item>
@@ -154,12 +164,14 @@
           <el-table :data="currentDepartureDates" border>
             <el-table-column prop="departDate" label="出发日期" min-width="150" />
             <el-table-column label="售价" width="120">
-              <template #default="{ row }">¥ {{ formatPrice(row.salePrice) }}</template>
+              <template #default="{ row }">￥ {{ formatPrice(row.salePrice) }}</template>
             </el-table-column>
             <el-table-column prop="remainCount" label="余量" width="100" />
             <el-table-column label="审核状态" width="120">
               <template #default="{ row }">
-                <el-tag :type="auditTag(row.auditStatus).type">{{ auditTag(row.auditStatus).text }}</el-tag>
+                <el-tag :type="auditTag(row.auditStatus).type" effect="light" round>
+                  {{ auditTag(row.auditStatus).text }}
+                </el-tag>
               </template>
             </el-table-column>
             <el-table-column label="审核说明" min-width="220" show-overflow-tooltip>
@@ -326,39 +338,43 @@ onMounted(load);
   margin-bottom: 18px;
 }
 
-.route-toolbar {
+.route-toolbar,
+.departure-toolbar {
   margin-bottom: 14px;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 12px;
 }
 
 .toolbar-left {
   display: flex;
   align-items: center;
   gap: 12px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .toolbar-search {
-  flex: 0 0 360px;
-  width: 360px;
+  flex: 0 1 520px;
+  width: 520px;
   max-width: 100%;
-}
-
-.departure-toolbar {
-  margin-bottom: 14px;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  min-width: 220px;
 }
 
 .route-filter {
   width: 320px;
+  max-width: 100%;
 }
 
 .toolbar-tip {
   color: #64748b;
   font-size: 13px;
+  white-space: nowrap;
+  margin-left: auto;
+  flex: 0 0 auto;
+  text-align: right;
 }
 
 .route-link {
@@ -399,9 +415,28 @@ onMounted(load);
   font-weight: 700;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 960px) {
+  .route-toolbar,
+  .departure-toolbar,
+  .toolbar-left {
+    flex-wrap: wrap;
+  }
+
+  .toolbar-left {
+    flex: 1 1 100%;
+  }
+
+  .toolbar-search,
   .route-filter {
     width: 100%;
+    flex-basis: 100%;
+  }
+
+  .toolbar-tip {
+    width: 100%;
+    white-space: normal;
+    margin-left: 0;
+    text-align: left;
   }
 }
 </style>

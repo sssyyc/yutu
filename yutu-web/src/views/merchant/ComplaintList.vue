@@ -6,7 +6,26 @@
     />
 
     <section class="page-card">
-      <el-table :data="list" border>
+      <div class="toolbar">
+        <div class="toolbar-left">
+          <el-input
+            v-model="keyword"
+            class="toolbar-search"
+            clearable
+            placeholder="请输入投诉号或投诉路线"
+            @clear="load"
+            @keyup.enter="load"
+          />
+          <el-button type="primary" @click="load">查询</el-button>
+          <el-button @click="resetSearch">重置</el-button>
+        </div>
+
+        <div class="toolbar-actions">
+          <el-button @click="load">刷新</el-button>
+        </div>
+      </div>
+
+      <el-table :data="list" border class="resource-table">
         <el-table-column prop="complaintNo" label="投诉单号" min-width="220" />
         <el-table-column prop="routeName" label="投诉路线" min-width="220" />
         <el-table-column prop="title" label="投诉标题" min-width="200" />
@@ -124,6 +143,7 @@ import AdminPageHero from "../../components/admin/AdminPageHero.vue";
 import { api } from "../../api";
 
 const list = ref([]);
+const keyword = ref("");
 const detail = ref({});
 const detailDialog = ref(false);
 const replyDialog = ref(false);
@@ -165,7 +185,9 @@ const OPERATOR_ROLE_TEXT = {
 };
 
 async function load() {
-  list.value = await api.get("/merchant/complaints");
+  const trimmedKeyword = keyword.value.trim();
+  const params = trimmedKeyword ? { keyword: trimmedKeyword } : undefined;
+  list.value = await api.get("/merchant/complaints", params);
 }
 
 async function view(id) {
@@ -189,6 +211,11 @@ async function submitReply() {
   ElMessage.success("回复成功");
   replyDialog.value = false;
   await load();
+}
+
+function resetSearch() {
+  keyword.value = "";
+  load();
 }
 
 function statusMeta(status) {
@@ -218,6 +245,41 @@ onMounted(load);
 </script>
 
 <style scoped>
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1 1 560px;
+  min-width: 0;
+}
+
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+}
+
+.toolbar-search {
+  width: 520px;
+  max-width: 100%;
+  flex: 0 1 520px;
+}
+
+.resource-table {
+  border-radius: 16px;
+  overflow: hidden;
+}
+
 .complaint-detail {
   display: grid;
   gap: 20px;
@@ -295,6 +357,22 @@ onMounted(load);
 }
 
 @media (max-width: 768px) {
+  .toolbar-left {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+  }
+
+  .toolbar-search {
+    width: 100%;
+    flex-basis: 100%;
+  }
+
+  .toolbar-actions {
+    width: 100%;
+    justify-content: flex-end;
+    margin-left: 0;
+  }
+
   .detail-section {
     padding: 18px 16px;
   }

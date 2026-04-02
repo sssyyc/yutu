@@ -36,6 +36,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -695,11 +696,15 @@ public class OrderService {
         tourOrderMapper.updateById(order);
     }
 
-    public List<TourOrder> merchantOrders() {
+    public List<TourOrder> merchantOrders(String keyword) {
         Long shopId = currentMerchantShopId();
-        List<TourOrder> orders = tourOrderMapper.selectList(new LambdaQueryWrapper<TourOrder>()
+        LambdaQueryWrapper<TourOrder> wrapper = new LambdaQueryWrapper<TourOrder>()
                 .eq(TourOrder::getMerchantId, shopId)
-                .orderByDesc(TourOrder::getCreateTime));
+                .orderByDesc(TourOrder::getCreateTime);
+        if (StringUtils.hasText(keyword)) {
+            wrapper.like(TourOrder::getOrderNo, keyword.trim());
+        }
+        List<TourOrder> orders = tourOrderMapper.selectList(wrapper);
         return decorateOrders(orders);
     }
 
@@ -711,15 +716,26 @@ public class OrderService {
         return orderDetailMap(order);
     }
 
-    public List<TourOrder> adminOrders() {
-        List<TourOrder> orders = tourOrderMapper.selectList(new LambdaQueryWrapper<TourOrder>()
-                .orderByDesc(TourOrder::getCreateTime));
+    public List<TourOrder> adminOrders(String keyword) {
+        LambdaQueryWrapper<TourOrder> wrapper = new LambdaQueryWrapper<TourOrder>()
+                .orderByDesc(TourOrder::getCreateTime);
+        if (StringUtils.hasText(keyword)) {
+            wrapper.like(TourOrder::getOrderNo, keyword.trim());
+        }
+        List<TourOrder> orders = tourOrderMapper.selectList(wrapper);
         return decorateOrders(orders);
     }
 
-    public List<PayRecord> adminPayRecords() {
-        return payRecordMapper.selectList(new LambdaQueryWrapper<PayRecord>()
-                .orderByDesc(PayRecord::getCreateTime));
+    public List<PayRecord> adminPayRecords(String keyword) {
+        LambdaQueryWrapper<PayRecord> wrapper = new LambdaQueryWrapper<PayRecord>()
+                .orderByDesc(PayRecord::getCreateTime);
+        if (StringUtils.hasText(keyword)) {
+            String trimmedKeyword = keyword.trim();
+            wrapper.and(q -> q.like(PayRecord::getPayNo, trimmedKeyword)
+                    .or()
+                    .like(PayRecord::getOrderNo, trimmedKeyword));
+        }
+        return payRecordMapper.selectList(wrapper);
     }
 
     public void adminHandleOrderException(Long id) {

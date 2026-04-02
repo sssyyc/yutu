@@ -6,6 +6,7 @@ import com.yutu.common.exception.BizException;
 import com.yutu.modules.merchant.dto.MerchantRouteDepartureDateRequest;
 import com.yutu.modules.merchant.dto.MerchantRouteSaveRequest;
 import com.yutu.modules.merchant.dto.MerchantShopUpdateRequest;
+import com.yutu.modules.merchant.vo.MerchantRouteDepartureDateVO;
 import com.yutu.modules.model.entity.MerchantShop;
 import com.yutu.modules.model.entity.SysUser;
 import com.yutu.modules.model.entity.TourDepartureDate;
@@ -24,6 +25,7 @@ import com.yutu.modules.model.mapper.TourRouteTagMapper;
 import com.yutu.modules.model.mapper.TourTagMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -136,6 +138,40 @@ public class MerchantService {
                 .orderByAsc(TourDepartureDate::getDepartDate));
     }
 
+    public List<MerchantRouteDepartureDateVO> routeDepartureDates() {
+        List<TourRoute> routes = routeList();
+        if (routes.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        Map<Long, TourRoute> routeMap = routes.stream()
+                .collect(Collectors.toMap(TourRoute::getId, item -> item, (left, right) -> left, HashMap::new));
+        List<Long> routeIds = new ArrayList<>(routeMap.keySet());
+
+        return tourDepartureDateMapper.selectList(new LambdaQueryWrapper<TourDepartureDate>()
+                        .in(TourDepartureDate::getRouteId, routeIds)
+                        .eq(TourDepartureDate::getStatus, 1)
+                        .orderByAsc(TourDepartureDate::getId))
+                .stream()
+                .map(item -> {
+                    TourRoute route = routeMap.get(item.getRouteId());
+                    MerchantRouteDepartureDateVO vo = new MerchantRouteDepartureDateVO();
+                    vo.setId(item.getId());
+                    vo.setRouteId(item.getRouteId());
+                    vo.setRouteName(route == null ? null : route.getRouteName());
+                    vo.setRouteAuditStatus(route == null ? null : route.getAuditStatus());
+                    vo.setRoutePublishStatus(route == null ? null : route.getPublishStatus());
+                    vo.setDepartDate(item.getDepartDate());
+                    vo.setRemainCount(item.getRemainCount());
+                    vo.setSalePrice(item.getSalePrice());
+                    vo.setAuditStatus(item.getAuditStatus());
+                    vo.setAuditRemark(item.getAuditRemark());
+                    vo.setStatus(item.getStatus());
+                    return vo;
+                })
+                .collect(Collectors.toList());
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public void updateRouteDates(Long routeId, List<MerchantRouteDepartureDateRequest> requests) {
         ownedRoute(routeId);
@@ -154,7 +190,7 @@ public class MerchantService {
         tourRouteMapper.updateById(route);
     }
 
-    public List<Map<String, Object>> customers() {
+    public List<Map<String, Object>> customers(String keyword) {
         List<TourOrder> orders = tourOrderMapper.selectList(new LambdaQueryWrapper<TourOrder>()
                 .eq(TourOrder::getMerchantId, currentShop().getId()));
         if (orders.isEmpty()) {
@@ -164,7 +200,7 @@ public class MerchantService {
         List<SysUser> users = sysUserMapper.selectList(new LambdaQueryWrapper<SysUser>().in(SysUser::getId, userIds));
         Map<Long, Long> countMap = orders.stream()
                 .collect(Collectors.groupingBy(TourOrder::getUserId, Collectors.counting()));
-        return users.stream().map(user -> {
+        List<Map<String, Object>> customers = users.stream().map(user -> {
             Map<String, Object> map = new HashMap<>();
             map.put("userId", user.getId());
             map.put("username", user.getUsername());
@@ -173,6 +209,15 @@ public class MerchantService {
             map.put("orderCount", countMap.getOrDefault(user.getId(), 0L));
             return map;
         }).collect(Collectors.toList());
+        if (!StringUtils.hasText(keyword)) {
+            return customers;
+        }
+        String trimmedKeyword = keyword.trim();
+        return customers.stream()
+                .filter(item -> containsKeyword(item.get("username"), trimmedKeyword)
+                        || containsKeyword(item.get("nickname"), trimmedKeyword)
+                        || containsKeyword(item.get("phone"), trimmedKeyword))
+                .collect(Collectors.toList());
     }
 
     public Map<String, Object> statsOverview() {
@@ -383,6 +428,11 @@ public class MerchantService {
         return leftValue.compareTo(rightValue);
     }
 
+    private boolean containsKeyword(Object source, String keyword) {
+        return source != null && StringUtils.hasText(String.valueOf(source))
+                && String.valueOf(source).contains(keyword);
+    }
+
     private TourRoute ownedRoute(Long routeId) {
         TourRoute route = tourRouteMapper.selectById(routeId);
         if (route == null || !Objects.equals(route.getMerchantId(), currentShop().getId())) {
@@ -406,5 +456,3 @@ public class MerchantService {
         return shop;
     }
 }
-
-

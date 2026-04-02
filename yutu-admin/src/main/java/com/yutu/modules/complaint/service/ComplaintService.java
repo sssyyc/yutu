@@ -20,6 +20,7 @@ import com.yutu.modules.model.mapper.TourOrderMapper;
 import com.yutu.modules.model.mapper.TourRouteMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -110,12 +111,27 @@ public class ComplaintService {
         return complaintMap(complaint);
     }
 
-    public List<ComplaintOrder> merchantList() {
+    public List<ComplaintOrder> merchantList(String keyword) {
         Long shopId = currentMerchantShopId();
         List<ComplaintOrder> complaints = complaintOrderMapper.selectList(new LambdaQueryWrapper<ComplaintOrder>()
                 .eq(ComplaintOrder::getMerchantId, shopId)
                 .orderByDesc(ComplaintOrder::getCreateTime));
-        return decorateComplaints(complaints);
+        List<ComplaintOrder> decoratedComplaints = decorateComplaints(complaints);
+        if (!StringUtils.hasText(keyword)) {
+            return decoratedComplaints;
+        }
+        String trimmedKeyword = keyword.trim();
+        List<ComplaintOrder> filteredComplaints = new ArrayList<>();
+        for (ComplaintOrder complaint : decoratedComplaints) {
+            if (complaint == null) {
+                continue;
+            }
+            if (containsKeyword(complaint.getComplaintNo(), trimmedKeyword)
+                    || containsKeyword(complaint.getRouteName(), trimmedKeyword)) {
+                filteredComplaints.add(complaint);
+            }
+        }
+        return filteredComplaints;
     }
 
     public Map<String, Object> merchantDetail(Long id) {
@@ -142,10 +158,25 @@ public class ComplaintService {
         addFlow(id, currentUserId(), "MERCHANT", "REPLY", request.getContent());
     }
 
-    public List<ComplaintOrder> adminList() {
+    public List<ComplaintOrder> adminList(String keyword) {
         List<ComplaintOrder> complaints = complaintOrderMapper.selectList(new LambdaQueryWrapper<ComplaintOrder>()
                 .orderByDesc(ComplaintOrder::getCreateTime));
-        return decorateComplaints(complaints);
+        List<ComplaintOrder> decoratedComplaints = decorateComplaints(complaints);
+        if (!StringUtils.hasText(keyword)) {
+            return decoratedComplaints;
+        }
+        String trimmedKeyword = keyword.trim();
+        List<ComplaintOrder> filteredComplaints = new ArrayList<>();
+        for (ComplaintOrder complaint : decoratedComplaints) {
+            if (complaint == null) {
+                continue;
+            }
+            if (containsKeyword(complaint.getComplaintNo(), trimmedKeyword)
+                    || containsKeyword(complaint.getRouteName(), trimmedKeyword)) {
+                filteredComplaints.add(complaint);
+            }
+        }
+        return filteredComplaints;
     }
 
     public Map<String, Object> adminDetail(Long id) {
@@ -270,6 +301,10 @@ public class ComplaintService {
         List<ComplaintOrder> list = new ArrayList<>();
         list.add(complaint);
         decorateComplaints(list);
+    }
+
+    private boolean containsKeyword(String source, String keyword) {
+        return StringUtils.hasText(source) && source.contains(keyword);
     }
 
     private Map<Long, TourOrder> loadOrdersForComplaints(List<ComplaintOrder> complaints) {

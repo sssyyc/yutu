@@ -14,12 +14,9 @@ public class ContractSignatureSchemaRunner implements ApplicationRunner {
     private static final String LEGACY_UNIQUE_INDEX = "uk_contract_signature_contract";
     private static final String SIGNER_UNIQUE_INDEX = "uk_contract_signature_contract_traveler";
     private static final String TRAVELER_ID_COLUMN = "traveler_id";
-    private static final String EXISTS_SQL =
-            "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?";
-    private static final String COLUMN_EXISTS_SQL =
-            "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?";
-    private static final String INDEX_EXISTS_SQL =
-            "SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?";
+    private static final String EXISTS_SQL = "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?";
+    private static final String COLUMN_EXISTS_SQL = "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?";
+    private static final String INDEX_EXISTS_SQL = "SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?";
     private static final String CREATE_SQL = "CREATE TABLE tour_contract_signature (" +
             "id BIGINT PRIMARY KEY AUTO_INCREMENT," +
             "contract_id BIGINT NOT NULL," +
@@ -56,7 +53,8 @@ public class ContractSignatureSchemaRunner implements ApplicationRunner {
     }
 
     private void ensureTravelerIdColumn() {
-        Integer columnCount = jdbcTemplate.queryForObject(COLUMN_EXISTS_SQL, Integer.class, TABLE_NAME, TRAVELER_ID_COLUMN);
+        Integer columnCount = jdbcTemplate.queryForObject(COLUMN_EXISTS_SQL, Integer.class, TABLE_NAME,
+                TRAVELER_ID_COLUMN);
         if (columnCount != null && columnCount > 0) {
             return;
         }
@@ -65,13 +63,15 @@ public class ContractSignatureSchemaRunner implements ApplicationRunner {
     }
 
     private void ensureSignatureIndexes() {
-        Integer legacyIndexCount = jdbcTemplate.queryForObject(INDEX_EXISTS_SQL, Integer.class, TABLE_NAME, LEGACY_UNIQUE_INDEX);
+        Integer legacyIndexCount = jdbcTemplate.queryForObject(INDEX_EXISTS_SQL, Integer.class, TABLE_NAME,
+                LEGACY_UNIQUE_INDEX);
         if (legacyIndexCount != null && legacyIndexCount > 0) {
             jdbcTemplate.execute("ALTER TABLE tour_contract_signature DROP INDEX " + LEGACY_UNIQUE_INDEX);
             log.info("Dropped legacy index {} from {}", LEGACY_UNIQUE_INDEX, TABLE_NAME);
         }
 
-        Integer signerIndexCount = jdbcTemplate.queryForObject(INDEX_EXISTS_SQL, Integer.class, TABLE_NAME, SIGNER_UNIQUE_INDEX);
+        Integer signerIndexCount = jdbcTemplate.queryForObject(INDEX_EXISTS_SQL, Integer.class, TABLE_NAME,
+                SIGNER_UNIQUE_INDEX);
         if (signerIndexCount != null && signerIndexCount > 0) {
             return;
         }

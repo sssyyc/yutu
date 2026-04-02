@@ -287,13 +287,30 @@ async function submit() {
 }
 
 .auth-form :deep(.el-form-item) {
+  display: flex;
+  align-items: center;
+  gap: 14px;
   margin-bottom: 18px;
 }
 
 .auth-form :deep(.el-form-item__label) {
-  padding-bottom: 8px;
+  display: flex;
+  align-items: center;
+  min-height: 50px;
+  padding: 0;
   color: #314750;
   font-weight: 700;
+}
+
+.auth-form :deep(.el-form-item__label-wrap) {
+  width: 72px;
+  margin: 0;
+  flex: 0 0 72px;
+}
+
+.auth-form :deep(.el-form-item__content) {
+  flex: 1;
+  min-width: 0;
 }
 
 :deep(.el-input__wrapper) {
@@ -356,6 +373,22 @@ async function submit() {
 
   .panel-title {
     font-size: 28px;
+  }
+
+  .auth-form :deep(.el-form-item) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .auth-form :deep(.el-form-item__label-wrap) {
+    width: 100%;
+    flex-basis: auto;
+  }
+
+  .auth-form :deep(.el-form-item__label) {
+    min-height: auto;
+    padding-bottom: 8px;
   }
 }
 </style>

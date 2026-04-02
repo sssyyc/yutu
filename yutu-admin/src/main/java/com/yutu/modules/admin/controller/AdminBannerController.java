@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -28,8 +29,8 @@ public class AdminBannerController {
 
     @PreAuthorize("hasAnyAuthority('admin:banner:list','admin:dashboard:view')")
     @GetMapping
-    public Result<List<SysBanner>> list() {
-        return Result.ok(adminBannerService.list());
+    public Result<List<SysBanner>> list(@RequestParam(required = false) String keyword) {
+        return Result.ok(adminBannerService.list(keyword));
     }
 
     @PreAuthorize("hasAnyAuthority('admin:banner:manage','admin:category:manage')")

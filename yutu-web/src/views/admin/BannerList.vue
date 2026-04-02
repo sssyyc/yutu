@@ -7,12 +7,26 @@
 
     <section class="page-card">
       <div class="toolbar">
-        <div class="toolbar-tip">当前共有 {{ list.length }} 张轮播图</div>
+        <div class="toolbar-left">
+          <el-input
+            v-model="keyword"
+            class="toolbar-search"
+            clearable
+            placeholder="请输入标题或关联路线"
+            @clear="load"
+            @keyup.enter="load"
+          />
+          <el-button type="primary" @click="load">查询</el-button>
+          <el-button @click="resetSearch">重置</el-button>
+        </div>
+
         <div class="toolbar-actions">
           <el-button type="primary" @click="openCreateDialog">新增轮播图</el-button>
           <el-button @click="load">刷新</el-button>
         </div>
       </div>
+
+      <div class="toolbar-tip">当前共有 {{ list.length }} 张轮播图</div>
 
       <el-table :data="list" border class="banner-table">
         <el-table-column prop="id" label="ID" width="80" />
@@ -143,14 +157,15 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from "vue"
-import { ElMessage, ElMessageBox } from "element-plus"
-import AdminPageHero from "../../components/admin/AdminPageHero.vue"
-import { api } from "../../api"
+import { onMounted, reactive, ref } from "vue";
+import { ElMessage, ElMessageBox } from "element-plus";
+import AdminPageHero from "../../components/admin/AdminPageHero.vue";
+import { api } from "../../api";
 
-const list = ref([])
-const routeOptions = ref([])
-const dialogVisible = ref(false)
+const list = ref([]);
+const routeOptions = ref([]);
+const keyword = ref("");
+const dialogVisible = ref(false);
 const form = reactive({
   id: null,
   title: "",
@@ -159,38 +174,40 @@ const form = reactive({
   linkUrl: "",
   sortNum: 0,
   status: 1
-})
+});
 
 function parseRouteIdFromLink(linkUrl) {
-  const match = String(linkUrl || "").trim().match(/^\/route\/detail\/(\d+)$/)
-  return match ? Number(match[1]) : null
+  const match = String(linkUrl || "").trim().match(/^\/route\/detail\/(\d+)$/);
+  return match ? Number(match[1]) : null;
 }
 
 function buildRouteLink(routeId) {
-  return routeId ? `/route/detail/${routeId}` : ""
+  return routeId ? `/route/detail/${routeId}` : "";
 }
 
 function resolveRouteName(row) {
-  const routeId = parseRouteIdFromLink(row.linkUrl)
-  const found = routeOptions.value.find((item) => item.id === routeId)
-  return found?.routeName || (row.linkUrl ? "已配置路线跳转" : "未关联路线")
+  const routeId = parseRouteIdFromLink(row.linkUrl);
+  const found = routeOptions.value.find((item) => item.id === routeId);
+  return found?.routeName || (row.linkUrl ? "已配置路线跳转" : "未关联路线");
 }
 
 async function load() {
   try {
-    list.value = await api.get("/admin/banners")
+    const trimmedKeyword = keyword.value.trim();
+    const params = trimmedKeyword ? { keyword: trimmedKeyword } : undefined;
+    list.value = await api.get("/admin/banners", params);
   } catch (error) {
     if (error?.response?.status === 404) {
-      ElMessage.error("后端未加载轮播图管理接口，请重启后端服务")
-      list.value = []
-      return
+      ElMessage.error("后端未加载轮播图管理接口，请重启后端服务");
+      list.value = [];
+      return;
     }
-    throw error
+    throw error;
   }
 }
 
 async function loadRouteOptions() {
-  routeOptions.value = await api.get("/routes")
+  routeOptions.value = await api.get("/routes");
 }
 
 function reset() {
@@ -202,16 +219,16 @@ function reset() {
     linkUrl: "",
     sortNum: 0,
     status: 1
-  })
+  });
 }
 
 function openCreateDialog() {
-  reset()
-  dialogVisible.value = true
+  reset();
+  dialogVisible.value = true;
 }
 
 function openEditDialog(row) {
-  reset()
+  reset();
   Object.assign(form, {
     id: row.id,
     title: row.title || "",
@@ -220,12 +237,12 @@ function openEditDialog(row) {
     linkUrl: row.linkUrl || "",
     sortNum: Number(row.sortNum || 0),
     status: Number(row.status === 0 ? 0 : 1)
-  })
-  dialogVisible.value = true
+  });
+  dialogVisible.value = true;
 }
 
 function handleRouteChange(routeId) {
-  form.linkUrl = buildRouteLink(routeId)
+  form.linkUrl = buildRouteLink(routeId);
 }
 
 function toPayload(source) {
@@ -235,42 +252,42 @@ function toPayload(source) {
     linkUrl: String(source.linkUrl || "").trim() || null,
     sortNum: Number(source.sortNum || 0),
     status: Number(source.status === 0 ? 0 : 1)
-  }
+  };
 }
 
 async function save() {
-  const payload = toPayload(form)
+  const payload = toPayload(form);
   if (!payload.title) {
-    ElMessage.warning("请输入轮播图标题")
-    return
+    ElMessage.warning("请输入轮播图标题");
+    return;
   }
   if (!payload.imageUrl) {
-    ElMessage.warning("请上传轮播图图片")
-    return
+    ElMessage.warning("请上传轮播图图片");
+    return;
   }
   if (!form.routeId || !payload.linkUrl) {
-    ElMessage.warning("请为轮播图选择对应的路线")
-    return
+    ElMessage.warning("请为轮播图选择对应的路线");
+    return;
   }
 
   if (form.id) {
-    await api.put(`/admin/banners/${form.id}`, payload)
+    await api.put(`/admin/banners/${form.id}`, payload);
   } else {
-    await api.post("/admin/banners", payload)
+    await api.post("/admin/banners", payload);
   }
-  dialogVisible.value = false
-  reset()
-  await load()
+  dialogVisible.value = false;
+  reset();
+  await load();
 }
 
 async function updateStatus(row, enabled) {
   const payload = toPayload({
     ...row,
     status: enabled ? 1 : 0
-  })
-  await api.put(`/admin/banners/${row.id}`, payload, { silent: true })
-  row.status = enabled ? 1 : 0
-  ElMessage.success("状态已更新")
+  });
+  await api.put(`/admin/banners/${row.id}`, payload, { silent: true });
+  row.status = enabled ? 1 : 0;
+  ElMessage.success("状态已更新");
 }
 
 async function remove(row) {
@@ -278,27 +295,32 @@ async function remove(row) {
     type: "warning",
     confirmButtonText: "删除",
     cancelButtonText: "取消"
-  })
-  await api.del(`/admin/banners/${row.id}`)
-  await load()
+  });
+  await api.del(`/admin/banners/${row.id}`);
+  await load();
 }
 
 async function uploadImage(options) {
-  const formData = new FormData()
-  formData.append("file", options.file)
+  const formData = new FormData();
+  formData.append("file", options.file);
   try {
-    const result = await api.upload("/files/upload", formData)
-    form.imageUrl = result.url
-    ElMessage.success("图片上传成功")
-    options.onSuccess?.(result)
+    const result = await api.upload("/files/upload", formData);
+    form.imageUrl = result.url;
+    ElMessage.success("图片上传成功");
+    options.onSuccess?.(result);
   } catch (error) {
-    options.onError?.(error)
+    options.onError?.(error);
   }
 }
 
+function resetSearch() {
+  keyword.value = "";
+  load();
+}
+
 onMounted(async () => {
-  await Promise.all([load(), loadRouteOptions()])
-})
+  await Promise.all([load(), loadRouteOptions()]);
+});
 </script>
 
 <style scoped>
@@ -311,15 +333,25 @@ onMounted(async () => {
   flex-wrap: wrap;
 }
 
-.toolbar-tip {
-  color: #64748b;
-  font-size: 14px;
-}
-
+.toolbar-left,
 .toolbar-actions,
 .dialog-actions {
   display: flex;
+  align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
+}
+
+.toolbar-search {
+  flex: 0 0 360px;
+  width: 360px;
+  max-width: 100%;
+}
+
+.toolbar-tip {
+  color: #64748b;
+  font-size: 14px;
+  margin-bottom: 18px;
 }
 
 .banner-table {

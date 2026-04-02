@@ -6,7 +6,26 @@
     />
 
     <section class="page-card">
-      <el-table :data="list" border>
+      <div class="toolbar">
+        <div class="toolbar-left">
+          <el-input
+            v-model="keyword"
+            class="toolbar-search"
+            clearable
+            placeholder="请输入投诉号或投诉路线"
+            @clear="load"
+            @keyup.enter="load"
+          />
+          <el-button type="primary" @click="load">查询</el-button>
+          <el-button @click="resetSearch">重置</el-button>
+        </div>
+
+        <div class="toolbar-actions">
+          <el-button @click="load">刷新</el-button>
+        </div>
+      </div>
+
+      <el-table :data="list" border class="resource-table">
         <el-table-column prop="complaintNo" label="投诉号" min-width="180" />
         <el-table-column prop="routeName" label="投诉路线" min-width="220" />
         <el-table-column prop="title" label="投诉标题" min-width="220" />
@@ -113,6 +132,7 @@ import AdminPageHero from "../../components/admin/AdminPageHero.vue";
 import { api } from "../../api";
 
 const list = ref([]);
+const keyword = ref("");
 const dialog = ref(false);
 const current = ref({});
 
@@ -137,7 +157,7 @@ const COMPLAINT_TYPE_TEXT = {
 const FLOW_ACTION_TEXT = {
   CREATE: "发起投诉",
   ACCEPT: "平台受理",
-  ASSIGN: "平台转交商户",
+  ASSIGN: "平台分派",
   REPLY: "商户回复",
   JUDGE: "平台判定",
   FINISH: "处理完成",
@@ -174,7 +194,9 @@ function formatDateTime(value) {
 }
 
 async function load() {
-  list.value = await api.get("/admin/complaints");
+  const trimmedKeyword = keyword.value.trim();
+  const params = trimmedKeyword ? { keyword: trimmedKeyword } : undefined;
+  list.value = await api.get("/admin/complaints", params);
 }
 
 async function detailComplaint(id) {
@@ -187,10 +209,43 @@ async function action(id, type) {
   await load();
 }
 
+function resetSearch() {
+  keyword.value = "";
+  load();
+}
+
 onMounted(load);
 </script>
 
 <style scoped>
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.toolbar-left,
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.toolbar-search {
+  flex: 0 0 360px;
+  width: 360px;
+  max-width: 100%;
+}
+
+.resource-table {
+  border-radius: 16px;
+  overflow: hidden;
+}
+
 .complaint-detail {
   display: grid;
   gap: 20px;
