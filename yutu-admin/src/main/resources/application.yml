@@ -1,0 +1,54 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: yutu-admin
+  datasource:
+    url: ${DB_URL:jdbc:mysql://127.0.0.1:3306/yutu_travel?useUnicode=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:password}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  redis:
+    host: ${REDIS_HOST:127.0.0.1}
+    port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD:}
+    timeout: 3000ms
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 30MB
+  jackson:
+    time-zone: Asia/Shanghai
+    date-format: yyyy-MM-dd HH:mm:ss
+
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+  type-aliases-package: com.yutu.modules.model.entity
+  global-config:
+    db-config:
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+jwt:
+  secret: yutu-platform-secret-key
+  expire-seconds: 86400
+
+app:
+  token:
+    redis-prefix: "YUTU:TOKEN:"
+  order:
+    payment-timeout-minutes: ${ORDER_PAYMENT_TIMEOUT_MINUTES:30}
+  file:
+    upload-dir: uploads
+  alipay:
+    enabled: true
+    protocol: https
+    gateway-host: openapi-sandbox.dl.alipaydev.com
+    app-id: 9021000140631563
+    merchant-private-key: MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCH9y4XVD7gEbhhcJX8dCBBdSC1fHjBLFgHBbFSqVnwWtUwdfdNz1DI8yxZpBKOv/yEU8JO9KXKywlIVilOpT5Pb5yT9JYXrxCEf3Ae5jKn/ylv4Og++sjtGwl9aNoQRJIwqvGZmsxWVMfTVxXIXDVkSnzSEf36bBZe6m/PQZC5J6O6/BTYPwVBYJPQfbOM4Ib7bR/qztHPoE7gGz3tnU+Nh/ItxlaQnOJRadPl9wvtL+BatIyyoA/cSXlZrpRcjib3CjhPekThTmiDPk/C5ITYFkEhLQyxHBTLz3QO2cWC5WwDyj/hTUVSfVKN0sehbwBP3gkHS80lPhHv1gN03qOpAgMBAAECggEAXKSY3D6EBQst9f7Pw8+gdtmHKwIgCYfchxRi6a8I4FQT9Uw78OG06ud+ram1F11LgyLLQB9EpHRJ4+cJiFPhrCChsNK0PnkDqTRoQjWaCIw9QMUfmmIo7B5DDheWlgUTE2Q28PHgD2b/LUqmRfpGSwrSGBU4WByz9YKKIs9K/E03U9n450NaXLyF4g6mwm5w27pHZm2BReDVPJQREPFGigwptRPEq+FEinJtZNFp/UKdWKeLp8Txtd5t2bFpPagdNG1dIAAyknDlon14fg+hNZqwHxYRCr0Szi7Vcz8fGvCXl5BcJ7KjMbP7K+LTI+SuroVCz6T45ifQcFEEK5957QKBgQDuF15U+K6cAKWN5pzZ1x/gzJsi01/ASKFFYDMVHqCDUTZwnNfifoIhm0N/9P2NZRREW83gAWZCwniZszJt5iTCsRzD5KB764PA0RKnolfy5BVQ5eiApyKlcU7PKc0RWLCQEXhrgpDuyWtiZsSdwc8epwdKWMNyBQufWvS3gjCUxwKBgQCSMU04wS8vLzS3Xs7ZsTppvB9eqooCQLprilJbSUFsQSoSQYR12ZQ8KI3xtSo68X82x+acGAp05XxZqWPX57DKDn/LN1tDfvVniCR5Pa1Nl+lyYTfUsrbQ9ZtJZ2Nh3p1vQbm6Olysu4MoHJByrS6qgijiEjX14Jk76B5JG0a0DwKBgC9XOCt/EwDz4/c2HoP2EWGabVJcYxKRnndz7FRLtbDGqiN0HDzt2KQkAiTkKrI9oe0BsArVXGbz0hUFm4Zcl3yayNRuljZtmtHxAFuSnRgvn8lpHXTPRsVMpVXtwterIdhTkPUXjgfcxtxXAMs5aRx4K6vtwFbgh/IUnMoMOeqrAoGAVqWH6lp9l863xPMZUGc9gsuwIBCd6YXpt7Fs7JP3haz9vYI9ewfxVtKGhrrkg7j8uEA0y1FoaS5WzGGcPqwg2TFMxupRWijWVH2ZeI54t+OQxm0ehR9DQYhAeHohqjEiSH3BEcJjiTE+JDkB2CYS4ZZxmsRGXSu4Roxl3tieyDsCgYApCvaiH19ZVebFE7Kn6O5VfHssuP0xG/uYNfhiMj+/Ki8F1T8SyGXLBzFl+isuIcB7cLanjuvVtPlbonWmykB6aA0Dq0tYqNNnNsKvqHn9HkMlA3oJzAwkVOVR+bPmOm7AjODDuO+kVf6jOsrURgtn4Dze8cVX7ZG9uoGe5QrvhQ==
+    alipay-public-key: MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAkzGQEqFozW2J2xycMX3rNlm4VftWbV0uARp56WTAIMfun9Z1uV4RLuUWU4G6t5X3BQm2KeoLmJ+ZRMSUVnppaN30lOWr/RycW4mj2ro2GB0u+SeHm7V+g/mBXVXsS74Bzxqol3Pz1SCW0S3hC1YvsYY8GXSz5Mmgtmrj+U2bq1vqjesPS+EXI0pZGKi1m+soW1hWlAOHJMyvoODzbXv9G/KbqBzrxSCU325CrZSs0NYHM6soGQC792jfHZgTGYNOqwy5gciHDR++bigl9E1ir32zQSdphYtxgKcfBBI/bTEIJALSZ95ZvVA2H7ZSCnTxePZ6TyMRaZUiS6QXpQmtDQIDAQAB
