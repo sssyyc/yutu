@@ -156,10 +156,20 @@
                 v-if="row.signStatus !== 'SIGNED'"
                 type="warning"
                 text
-                @click="$router.push(`/contract/detail/${row.id}?action=sign`)"
+                @click="$router.push(`/contract/detail/${row.id}`)"
               >
                 去签署
               </el-button>
+            </div>
+            <div class="contract-appendix-block">
+              <div class="contract-appendix-title">补充附件（{{ contractAppendices(row).length }} 项）</div>
+              <div v-if="contractAppendices(row).length" class="contract-appendix-list">
+                <article v-for="item in contractAppendices(row)" :key="item.id" class="contract-appendix-item">
+                  <strong>{{ item.appendixTitle || "未命名附件" }}</strong>
+                  <p>{{ item.appendixContent || "暂无附件内容" }}</p>
+                </article>
+              </div>
+              <p v-else class="contract-appendix-empty">当前合同暂无补充附件</p>
             </div>
           </div>
         </div>
@@ -169,7 +179,7 @@
       <article class="page-card refund-card">
         <div class="section-head">
           <div>
-            <h3>退款生命周期</h3>
+            <h3>退款流程</h3>
             <p>用户发起、商家审核、管理员仲裁和退款执行全过程都会留痕。</p>
           </div>
           <el-tag v-if="refund.id" :type="refundStatusTag(refund.status).type" effect="light" round>
@@ -377,6 +387,7 @@ const supplementDialogVisible = ref(false);
 const submittingRefund = ref(false);
 const submittingSupplement = ref(false);
 const refundEstimate = ref(null);
+const contractDetailMap = ref({});
 
 const refundForm = reactive({
   refundType: "",
@@ -395,7 +406,12 @@ const order = computed(() => detail.value.order || {});
 const routeInfo = computed(() => detail.value.route || {});
 const departureDate = computed(() => detail.value.departureDate || {});
 const travelers = computed(() => detail.value.travelers || []);
-const contracts = computed(() => detail.value.contracts || []);
+const contracts = computed(() => (
+  (detail.value.contracts || []).map((item) => ({
+    ...item,
+    appendices: contractDetailMap.value[item.id]?.appendices || item.appendices || []
+  }))
+));
 const refund = computed(() => detail.value.refund || {});
 const refundFlows = computed(() => detail.value.refundFlows || []);
 const canApplyRefund = computed(() => order.value.payStatus === "PAID" && !refund.value.id);
@@ -582,6 +598,28 @@ function statusLevel(status, successList = [], runningList = [], pendingList = [
 
 async function loadDetail() {
   detail.value = await api.get(`/orders/${route.params.id}`);
+  await loadContractDetails();
+}
+
+async function loadContractDetails() {
+  const rows = detail.value.contracts || [];
+  if (!rows.length) {
+    contractDetailMap.value = {};
+    return;
+  }
+  const entries = await Promise.all(rows.map(async (item) => {
+    try {
+      const contractDetail = await api.get(`/contracts/${item.id}`, undefined, { silent: true });
+      return [item.id, contractDetail];
+    } catch {
+      return [item.id, null];
+    }
+  }));
+  contractDetailMap.value = Object.fromEntries(entries.filter(([, value]) => Boolean(value)));
+}
+
+function contractAppendices(contract) {
+  return Array.isArray(contract?.appendices) ? contract.appendices.filter(Boolean) : [];
 }
 
 function goPay() {
@@ -1147,6 +1185,44 @@ onMounted(loadDetail);
   margin-top: 10px;
   display: flex;
   gap: 12px;
+}
+
+.contract-appendix-block {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed #d7e1ee;
+}
+
+.contract-appendix-title {
+  color: #0f172a;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.contract-appendix-list {
+  display: grid;
+  gap: 10px;
+}
+
+.contract-appendix-item {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+}
+
+.contract-appendix-item strong {
+  display: block;
+  color: #0f172a;
+}
+
+.contract-appendix-item p,
+.contract-appendix-empty {
+  margin: 6px 0 0;
+  color: #64748b;
+  line-height: 1.7;
+  white-space: pre-line;
+  word-break: break-word;
 }
 
 .refund-summary {

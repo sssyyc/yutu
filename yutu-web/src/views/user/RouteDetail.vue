@@ -576,7 +576,7 @@ async function createOrder() {
     ElMessage.success("婵犵數濮烽弫鎼佸磻閻愬搫鍨傞柛顐ｆ礀缁犱即鏌熼梻瀵歌窗闁轰礁瀚伴弻娑樷槈閸楃偛绠婚梺鍝勬４缁犳捇寮婚敐澶婄睄闁稿本鑹炬禒妯肩磽娴ｅ搫顎撶紓宥勭窔瀵鎮㈤崗鑲╁姺闂佹寧娲嶉崑鎾愁熆瑜滈崰妤呭Φ?);
     orderDialog.value = false;
     if (payload?.contractId) {
-      router.push(`/contract/detail/${payload.contractId}?action=sign`);
+      router.push(`/contract/detail/${payload.contractId}`);
       return;
     }
     router.push(`/order/detail/${payload?.orderId}`);
@@ -643,7 +643,7 @@ async function createOrder() {
     ElMessage.success("订单创建成功，即将进入合同签署流程");
     orderDialog.value = false;
     if (payload?.contractId) {
-      router.push(`/contract/detail/${payload.contractId}?action=sign`);
+      router.push(`/contract/detail/${payload.contractId}`);
       return;
     }
     router.push(`/order/detail/${payload?.orderId}`);

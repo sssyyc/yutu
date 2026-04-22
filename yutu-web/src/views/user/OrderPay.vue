@@ -511,7 +511,7 @@ function goContract(withSignAction = false) {
     ElMessage.warning("当前订单暂时没有合同信息")
     return
   }
-  router.push(`/contract/detail/${primaryContract.value.id}${withSignAction ? "?action=sign" : ""}`)
+  router.push(`/contract/detail/${primaryContract.value.id}`)
 }
 
 function openOnCurrentDevice() {

@@ -12,7 +12,7 @@
         </div>
         <div class="hero-actions">
           <el-button type="primary" @click="downloadContract">下载合同</el-button>
-          <el-button v-if="canSign" type="success" plain @click="scrollToSignature">前往签署</el-button>
+          <el-button v-if="canSign" type="success" plain @click="openSignatureDialog">电子签名</el-button>
           <el-button v-else-if="canPay" type="warning" plain @click="goToPayment">前往支付</el-button>
         </div>
       </div>
@@ -79,7 +79,7 @@
       <el-empty v-else description="当前合同暂无补充附件" />
     </section>
 
-    <section ref="signatureSectionRef" class="page-card signature-card">
+    <section class="page-card signature-card">
       <div class="section-head">
         <h3>电子签名</h3>
         <span>{{ signatureSectionCaption }}</span>
@@ -116,53 +116,13 @@
       </div>
       <el-empty v-else description="当前订单暂无出行人信息，暂时无法签署合同" />
 
-      <template v-if="canSign">
-        <div class="signer-form-row">
-          <div class="signer-form">
-            <label>本次签署人</label>
-            <el-select
-              v-model="signForm.travelerId"
-              placeholder="请选择待签署的出行人"
-            >
-              <el-option
-                v-for="(traveler, index) in pendingTravelers"
-                :key="traveler.id"
-                :label="travelerOptionLabel(traveler, index)"
-                :value="traveler.id"
-              />
-            </el-select>
-          </div>
-          <div class="signer-preview">
-            <span>签署姓名</span>
-            <strong>{{ currentSignerName || "请选择出行人" }}</strong>
-          </div>
+      <div v-if="canSign" class="signature-callout">
+        <div>
+          <strong>请先从上方查看完整合同正文</strong>
+          <p>确认合同正文、线路信息和补充附件后，再点击电子签名书写并提交。</p>
         </div>
-
-        <p class="signature-hint">{{ signatureHint }}</p>
-
-        <div class="signature-board">
-          <canvas
-            ref="signatureCanvasRef"
-            class="signature-canvas"
-            @pointerdown="startDraw"
-            @pointermove="draw"
-            @pointerup="endDraw"
-            @pointerleave="endDraw"
-          />
-        </div>
-
-        <div class="signature-actions">
-          <el-button @click="clearSignature">清除签名</el-button>
-          <el-button
-            type="primary"
-            :loading="signing"
-            :disabled="!currentSignerName"
-            @click="submitSignature"
-          >
-            确认签署
-          </el-button>
-        </div>
-      </template>
+        <el-button type="primary" @click="openSignatureDialog">电子签名</el-button>
+      </div>
 
       <div v-else-if="allSigned" class="signed-complete">
         <strong>全部出行人已完成电子签名</strong>
@@ -192,6 +152,64 @@
         </div>
       </div>
     </section>
+
+    <el-dialog
+      v-model="signatureDialogVisible"
+      title="电子签名"
+      width="760px"
+      class="signature-dialog"
+      destroy-on-close
+      @opened="initCanvas"
+      @closed="resetCanvasState"
+    >
+      <div class="signer-form-row">
+        <div class="signer-form">
+          <label>本次签署人</label>
+          <el-select
+            v-model="signForm.travelerId"
+            placeholder="请选择待签署的出行人"
+          >
+            <el-option
+              v-for="(traveler, index) in pendingTravelers"
+              :key="traveler.id"
+              :label="travelerOptionLabel(traveler, index)"
+              :value="traveler.id"
+            />
+          </el-select>
+        </div>
+        <div class="signer-preview">
+          <span>签署姓名</span>
+          <strong>{{ currentSignerName || "请选择出行人" }}</strong>
+        </div>
+      </div>
+
+      <p class="signature-hint">{{ signatureHint }}</p>
+
+      <div class="signature-board">
+        <canvas
+          ref="signatureCanvasRef"
+          class="signature-canvas"
+          @pointerdown="startDraw"
+          @pointermove="draw"
+          @pointerup="endDraw"
+          @pointerleave="endDraw"
+        />
+      </div>
+
+      <template #footer>
+        <div class="signature-actions">
+          <el-button @click="clearSignature">清除签名</el-button>
+          <el-button
+            type="primary"
+            :loading="signing"
+            :disabled="!currentSignerName"
+            @click="submitSignature"
+          >
+            确认签署
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -205,8 +223,8 @@ const route = useRoute();
 const router = useRouter();
 const data = ref({});
 const signing = ref(false);
+const signatureDialogVisible = ref(false);
 const signatureCanvasRef = ref(null);
-const signatureSectionRef = ref(null);
 const isDrawing = ref(false);
 const hasSignatureStroke = ref(false);
 let context2d = null;
@@ -366,15 +384,10 @@ const signatureHint = computed(() => {
 async function load() {
   data.value = await api.get(`/contracts/${route.params.id}`);
   syncSelectedTraveler();
-  await nextTick();
-  if (canSign.value) {
-    initCanvas();
-    if (route.query.action === "sign") {
-      scrollToSignature();
-    }
-    return;
+  if (!canSign.value) {
+    signatureDialogVisible.value = false;
+    resetCanvasState();
   }
-  resetCanvasState();
 }
 
 function syncSelectedTraveler() {
@@ -450,8 +463,12 @@ function clearSignature() {
   initCanvas();
 }
 
-function scrollToSignature() {
-  signatureSectionRef.value?.scrollIntoView({ behavior: "smooth", block: "start" });
+function openSignatureDialog() {
+  if (!canSign.value) {
+    return;
+  }
+  signatureDialogVisible.value = true;
+  nextTick(initCanvas);
 }
 
 function triggerDownload(fileName, content) {
@@ -495,6 +512,7 @@ async function submitSignature() {
     });
 
     await load();
+    signatureDialogVisible.value = false;
 
     if (allSigned.value) {
       ElMessage.success("全部出行人已完成合同签署");
@@ -591,14 +609,6 @@ function resolveCount(value, fallback) {
 
 watch(() => route.params.id, () => {
   load();
-});
-
-watch(() => route.query.action, (action) => {
-  if (action === "sign" && canSign.value) {
-    nextTick(() => {
-      scrollToSignature();
-    });
-  }
 });
 
 onMounted(load);
@@ -885,6 +895,29 @@ onMounted(load);
   font-size: 12px;
 }
 
+.signature-callout {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+  border-radius: 18px;
+  background: #f8fbff;
+  border: 1px solid #e2eaf5;
+}
+
+.signature-callout strong {
+  display: block;
+  color: #152847;
+  font-size: 17px;
+}
+
+.signature-callout p {
+  margin: 8px 0 0;
+  color: #64748b;
+  line-height: 1.7;
+}
+
 .signer-form-row {
   display: grid;
   grid-template-columns: minmax(0, 360px) minmax(220px, 1fr);
@@ -1054,12 +1087,14 @@ onMounted(load);
 
   .progress-strip,
   .traveler-status-item,
+  .signature-callout,
   .signer-form-row {
     grid-template-columns: 1fr;
   }
 
   .progress-strip,
-  .traveler-status-item {
+  .traveler-status-item,
+  .signature-callout {
     display: grid;
   }
 

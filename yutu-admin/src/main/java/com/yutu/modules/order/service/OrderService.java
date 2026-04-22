@@ -358,9 +358,6 @@ public class OrderService {
         ContractTemplate routeTemplate = route.getRouteTemplateId() == null
                 ? null
                 : contractTemplateMapper.selectById(route.getRouteTemplateId());
-        ContractTemplate supplementTemplate = route.getSupplementTemplateId() == null
-                ? null
-                : contractTemplateMapper.selectById(route.getSupplementTemplateId());
         if (standardTemplate == null || routeTemplate == null) {
             throw new BizException(500, "褰撳墠璺嚎鏈厤缃畬鏁寸殑鍚堝悓妯℃澘");
         }
@@ -380,16 +377,13 @@ public class OrderService {
         MerchantShop merchantShop = merchantShopMapper.selectById(order.getMerchantId());
         TourDepartureDate departureDate = tourDepartureDateMapper.selectById(order.getDepartDateId());
         contract.setContractContent(buildContractContent(contract, order, route, departureDate, user, merchantShop,
-                travelers, standardTemplate, routeTemplate, supplementTemplate));
+                travelers, standardTemplate, routeTemplate));
         contract.setSignStatus("UNSIGNED");
         contract.setDeleted(0);
         tourContractMapper.insert(contract);
         try {
             contractTemplateMapper.incrementUseCount(standardTemplate.getId());
             contractTemplateMapper.incrementUseCount(routeTemplate.getId());
-            if (supplementTemplate != null) {
-                contractTemplateMapper.incrementUseCount(supplementTemplate.getId());
-            }
         } catch (Exception ex) {
             log.warn("failed to increase contract template use count for routeId={}", route.getId(), ex);
         }
@@ -404,8 +398,7 @@ public class OrderService {
                                         MerchantShop merchantShop,
                                         List<TourOrderTraveler> travelers,
                                         ContractTemplate standardTemplate,
-                                        ContractTemplate routeTemplate,
-                                        ContractTemplate supplementTemplate) {
+                                        ContractTemplate routeTemplate) {
         List<String> sections = new ArrayList<>();
         sections.add(ContractContentRenderer.render(
                 standardTemplate.getTemplateContent(),
@@ -427,18 +420,6 @@ public class OrderService {
                 merchantShop,
                 travelers
         ));
-        if (supplementTemplate != null) {
-            sections.add(ContractContentRenderer.render(
-                    supplementTemplate.getTemplateContent(),
-                    contract,
-                    order,
-                    route,
-                    departureDate,
-                    user,
-                    merchantShop,
-                    travelers
-            ));
-        }
         return sections.stream()
                 .filter(Objects::nonNull)
                 .filter(item -> !item.trim().isEmpty())

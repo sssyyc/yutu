@@ -1,8 +1,8 @@
 <template>
   <div class="admin-module-page">
     <AdminPageHero
-      kicker="Resource Management"
-      title="自定义资源"
+      kicker="Type Management"
+      title="旅游标签"
     />
 
     <section class="page-card module-overview">
@@ -10,7 +10,7 @@
         <article class="overview-card">
           <span class="overview-label">标签总数</span>
           <strong class="overview-value">{{ overview.total }}</strong>
-          <p class="overview-note">当前自定义资源标签列表中的标签总量。</p>
+          <p class="overview-note">当前旅游标签列表中的标签总量。</p>
         </article>
         <article class="overview-card">
           <span class="overview-label">启用标签</span>

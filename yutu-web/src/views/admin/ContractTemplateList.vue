@@ -43,7 +43,7 @@
           />
           <el-select v-model="typeFilter" class="toolbar-select" clearable placeholder="模板类型">
             <el-option
-              v-for="option in TEMPLATE_TYPE_OPTIONS"
+              v-for="option in ADMIN_TEMPLATE_TYPE_OPTIONS"
               :key="option.value"
               :label="option.label"
               :value="option.value"
@@ -138,7 +138,7 @@
       @closed="reset"
     >
       <div class="dialog-intro">
-        按照“国家制式合同 + 线路附件 + 附加合同”的三段式结构维护模板，确保合同既合规又能适配业务场景。
+        管理员端维护国家制式合同和线路附件；商家额外补充的附加合同内容不在此处展示。
       </div>
 
       <el-form :model="form" label-width="100px" class="template-form">
@@ -154,7 +154,7 @@
             <el-form-item label="模板类型">
               <el-select v-model="form.templateType" placeholder="请选择模板类型" @change="handleTypeChange">
                 <el-option
-                  v-for="option in TEMPLATE_TYPE_OPTIONS"
+                  v-for="option in ADMIN_TEMPLATE_TYPE_OPTIONS"
                   :key="option.value"
                   :label="option.label"
                   :value="option.value"
@@ -253,28 +253,6 @@
               </el-form-item>
             </div>
           </template>
-
-          <template v-else>
-            <div class="content-tip">
-              附加合同用于处理补充协议和特殊约定，应明确适用场景与补充条款内容。
-            </div>
-            <div class="form-grid">
-              <el-form-item label="补充主题">
-                <el-input v-model="form.supplementTheme" placeholder="如：行程微调补充协议" />
-              </el-form-item>
-              <el-form-item label="适用场景">
-                <el-input v-model="form.supplementScenario" placeholder="如：订单改期、资源调整、特殊赔付" />
-              </el-form-item>
-              <el-form-item label="补充条款" class="grid-span-2">
-                <el-input
-                  v-model="form.supplementClauses"
-                  type="textarea"
-                  :rows="8"
-                  placeholder="请输入补充约定、责任划分、赔付说明等内容"
-                />
-              </el-form-item>
-            </div>
-          </template>
         </div>
       </el-form>
 
@@ -332,6 +310,8 @@ const TEMPLATE_TYPE_OPTIONS = [
   { label: "线路附件", value: "ROUTE" },
   { label: "附加合同", value: "SUPPLEMENT" }
 ];
+
+const ADMIN_TEMPLATE_TYPE_OPTIONS = TEMPLATE_TYPE_OPTIONS.filter((item) => item.value !== "SUPPLEMENT");
 
 const APPLY_SCOPE_OPTIONS = [
   { label: "国内游", value: "DOMESTIC" },
@@ -499,6 +479,9 @@ const filteredList = computed(() => {
   return list.value
     .map(enrichTemplate)
     .filter((item) => {
+      if (item.templateType === "SUPPLEMENT") {
+        return false;
+      }
       const matchType = !typeFilter.value || item.templateType === typeFilter.value;
       const matchScope = !scopeFilter.value || item.applyScope === scopeFilter.value;
       const matchStatus = statusFilter.value === "" || item.status === statusFilter.value;
@@ -610,31 +593,20 @@ function buildTemplateContent() {
   }
 
   if (form.templateType === "ROUTE") {
-    return `线路附件（行程与服务确认单）
+    return `线路附件
 
 适用范围：${scopeText(form.applyScope)}
-适用线路：______________
-出发日期：______________
-预计结束：______________
-目的地：______________
-
-一、行程安排
+行程安排：
 ${form.routeArrangement || "-"}
 
-二、服务标准
+服务标准：
 ${form.serviceStandards || "-"}
 
-三、费用包含
-${form.feeIncludes || "-"}
+费用包含：${form.feeIncludes || "-"}
 
-四、费用不含
-${form.feeExcludes || "-"}
+费用不含：${form.feeExcludes || "-"}
 
-五、出行确认与退改规则
-${form.refundRules || "-"}
-
-六、附件效力
-本附件仅用于确认具体线路的行程、服务和费用信息；未列明事项仍以国家制式合同及平台订单记录为准。`;
+退改规则：${form.refundRules || "-"}`;
   }
 
   return `附加合同（特殊约定补充协议）

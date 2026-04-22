@@ -174,9 +174,6 @@ public class RouteContractBackfillRunner implements ApplicationRunner {
 
             ContractTemplate standardTemplate = templateMap.get(route.getStandardTemplateId());
             ContractTemplate routeTemplate = templateMap.get(route.getRouteTemplateId());
-            ContractTemplate supplementTemplate = route.getSupplementTemplateId() == null
-                    ? null
-                    : templateMap.get(route.getSupplementTemplateId());
             if (standardTemplate == null || routeTemplate == null) {
                 continue;
             }
@@ -190,8 +187,7 @@ public class RouteContractBackfillRunner implements ApplicationRunner {
                     merchantMap.get(order.getMerchantId()),
                     travelerMap.getOrDefault(order.getId(), new ArrayList<>()),
                     standardTemplate,
-                    routeTemplate,
-                    supplementTemplate
+                    routeTemplate
             );
 
             boolean changed = false;
@@ -229,8 +225,7 @@ public class RouteContractBackfillRunner implements ApplicationRunner {
                                         MerchantShop merchantShop,
                                         List<TourOrderTraveler> travelers,
                                         ContractTemplate standardTemplate,
-                                        ContractTemplate routeTemplate,
-                                        ContractTemplate supplementTemplate) {
+                                        ContractTemplate routeTemplate) {
         List<String> sections = new ArrayList<>();
         sections.add(ContractContentRenderer.render(
                 standardTemplate.getTemplateContent(),
@@ -252,18 +247,6 @@ public class RouteContractBackfillRunner implements ApplicationRunner {
                 merchantShop,
                 travelers
         ));
-        if (supplementTemplate != null) {
-            sections.add(ContractContentRenderer.render(
-                    supplementTemplate.getTemplateContent(),
-                    contract,
-                    order,
-                    route,
-                    departureDate,
-                    user,
-                    merchantShop,
-                    travelers
-            ));
-        }
         return sections.stream()
                 .filter(Objects::nonNull)
                 .map(String::trim)

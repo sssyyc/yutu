@@ -31,9 +31,9 @@
         <el-sub-menu index="resource-management">
           <template #title>
             <el-icon><Collection /></el-icon>
-            <span>资源管理</span>
+            <span>类型管理</span>
           </template>
-          <el-menu-item index="/admin/tag/list">自定义资源</el-menu-item>
+          <el-menu-item index="/admin/tag/list">旅游标签</el-menu-item>
           <el-menu-item index="/admin/category/list">旅游形式</el-menu-item>
         </el-sub-menu>
 
