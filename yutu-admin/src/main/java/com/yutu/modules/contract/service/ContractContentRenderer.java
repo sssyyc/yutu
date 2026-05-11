@@ -74,6 +74,11 @@ public final class ContractContentRenderer {
         context.contractDate = formatChineseDate(contract == null ? null : toDate(contract.getCreateTime()));
         context.signDate = formatChineseDate(contract == null ? null : toDate(contract.getSignTime()));
         context.currentDate = formatChineseDate(LocalDate.now());
+        context.depositDeadlineDate = context.departDate == null ? LocalDate.now() : context.departDate;
+        context.depositAmountText = context.amountText;
+        context.balanceDueDays = "1";
+        context.contractCopies = "2";
+        context.partyCopies = "1";
         context.merchantName = safe(merchantShop == null ? null : merchantShop.getShopName(), "待确认");
         context.merchantContact = safe(merchantShop == null ? null : merchantShop.getContactName(), "待确认");
         context.merchantPhone = safe(merchantShop == null ? null : merchantShop.getContactPhone(), "待确认");
@@ -123,6 +128,16 @@ public final class ContractContentRenderer {
         replacements.put("${signDate}", context.signDate);
         replacements.put("{{currentDate}}", context.currentDate);
         replacements.put("${currentDate}", context.currentDate);
+        replacements.put("{{depositDeadlineDate}}", formatChineseDate(context.depositDeadlineDate));
+        replacements.put("${depositDeadlineDate}", formatChineseDate(context.depositDeadlineDate));
+        replacements.put("{{depositAmount}}", context.depositAmountText);
+        replacements.put("${depositAmount}", context.depositAmountText);
+        replacements.put("{{balanceDueDays}}", context.balanceDueDays);
+        replacements.put("${balanceDueDays}", context.balanceDueDays);
+        replacements.put("{{contractCopies}}", context.contractCopies);
+        replacements.put("${contractCopies}", context.contractCopies);
+        replacements.put("{{partyCopies}}", context.partyCopies);
+        replacements.put("${partyCopies}", context.partyCopies);
 
         String result = templateContent;
         for (Map.Entry<String, String> entry : replacements.entrySet()) {
@@ -174,6 +189,12 @@ public final class ContractContentRenderer {
         }
         if (trimmed.startsWith("（一）旅游费用总额") || trimmed.startsWith("合同金额") || trimmed.startsWith("旅游费用总额")) {
             return replaceAmountLine(line, context.amountUpper, context.amountText);
+        }
+        if (trimmed.startsWith("（四）支付方式") || trimmed.startsWith("支付方式")) {
+            return replacePaymentLine(line, context);
+        }
+        if (trimmed.startsWith("（三）本合同一式") || trimmed.startsWith("本合同一式")) {
+            return replaceContractCopiesLine(line, context);
         }
         if (trimmed.startsWith("签署日期")) {
             return replaceDateAfterColon(line, context.signDate);
@@ -230,6 +251,26 @@ public final class ContractContentRenderer {
             return result;
         }
         return replaceValueAfterColon(line, "人民币（大写）" + amountUpper + "（￥" + amountText + "元）");
+    }
+
+    private static String replacePaymentLine(String line, RenderContext context) {
+        String result = line;
+        LocalDate deadline = context.depositDeadlineDate;
+        if (deadline != null) {
+            result = result.replaceFirst("[_＿—-]{2,}\\s*年", String.valueOf(deadline.getYear()) + "年");
+            result = result.replaceFirst("[_＿—-]{2,}\\s*月", String.valueOf(deadline.getMonthValue()) + "月");
+            result = result.replaceFirst("[_＿—-]{2,}\\s*日", String.valueOf(deadline.getDayOfMonth()) + "日");
+        }
+        result = result.replaceFirst("￥\\s*[_＿—-]{2,}\\s*元", "￥" + context.depositAmountText + "元");
+        result = result.replaceFirst("出发前\\s*[_＿—-]{2,}\\s*日", "出发前" + context.balanceDueDays + "日");
+        return result;
+    }
+
+    private static String replaceContractCopiesLine(String line, RenderContext context) {
+        String result = line;
+        result = result.replaceFirst("一式\\s*[_＿—-]{2,}\\s*份", "一式" + context.contractCopies + "份");
+        result = result.replaceFirst("各执\\s*[_＿—-]{2,}\\s*份", "各执" + context.partyCopies + "份");
+        return result;
     }
 
     private static String resolvePartyA(SysUser user, List<TourOrderTraveler> travelers) {
@@ -440,6 +481,11 @@ public final class ContractContentRenderer {
         private String contractDate;
         private String signDate;
         private String currentDate;
+        private LocalDate depositDeadlineDate;
+        private String depositAmountText;
+        private String balanceDueDays;
+        private String contractCopies;
+        private String partyCopies;
         private String merchantName;
         private String merchantContact;
         private String merchantPhone;

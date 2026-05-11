@@ -368,12 +368,16 @@ const selectedDate = computed(() => {
   return dates.value.find((item) => Number(item.id) === Number(selectedDateId.value)) || null;
 });
 
+const canCreateOrder = computed(() => {
+  return auth.hasPerm("order:create");
+});
+
 const canOpenBooking = computed(() => {
-  return auth.user?.roleType === 1 && dates.value.length > 0;
+  return canCreateOrder.value && dates.value.length > 0;
 });
 
 const bookingButtonText = computed(() => {
-  if (auth.user?.roleType !== 1) {
+  if (!canCreateOrder.value) {
     return "仅游客可预订";
   }
   if (!dates.value.length) {
@@ -414,8 +418,8 @@ const positiveReviewRateText = computed(() => {
 });
 
 const bookingTip = computed(() => {
-  if (auth.user?.roleType !== 1) {
-    return "当前为商家预览账号，请切换游客账号下单。";
+  if (!canCreateOrder.value) {
+    return "当前账号暂无下单权限，请切换可预订账号下单。";
   }
   if (!selectedDate.value) {
     return "请选择一个可预约的出发日期后再提交订单。";
@@ -588,8 +592,8 @@ async function createOrder() {
 */
 
 async function openSelectedOrder() {
-  if (auth.user?.roleType !== 1) {
-    ElMessage.info("仅游客账号可预订");
+  if (!canCreateOrder.value) {
+    ElMessage.info("当前账号暂无下单权限");
     return;
   }
   if (!dates.value.length) {

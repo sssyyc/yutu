@@ -67,6 +67,7 @@ public class OrderService {
     private static final long PAYMENT_QR_REUSE_MINUTES = 10L;
     private static final long PAYMENT_STATUS_CONFIRM_GRACE_MINUTES = 1L;
     private static final String ORDER_STATUS_COMPLETED = "COMPLETED";
+    private static final String ORDER_STATUS_PENDING_TRAVEL = "PENDING_TRAVEL";
     private static final String ORDER_STATUS_CANCELLED = "CANCELLED";
     private static final String ORDER_STATUS_EXPIRED = "EXPIRED";
     private static final String PAY_STATUS_UNPAID = "UNPAID";
@@ -537,7 +538,7 @@ public class OrderService {
         payRecordMapper.updateById(payRecord);
 
         order.setPayStatus("PAID");
-        order.setOrderStatus("COMPLETED");
+        order.setOrderStatus(ORDER_STATUS_PENDING_TRAVEL);
         tourOrderMapper.updateById(order);
         refreshOrderLifecycleState(order);
         refreshOrderPaymentWindow(order);
@@ -715,8 +716,7 @@ public class OrderService {
         if (!PAY_STATUS_PAID.equals(order.getPayStatus())) {
             return;
         }
-        if (Arrays.asList(ORDER_STATUS_CANCELLED, "REFUNDING", "REFUNDED", ORDER_STATUS_EXPIRED)
-                .contains(order.getOrderStatus())) {
+        if (isRefundOrderStatus(order)) {
             return;
         }
 
@@ -729,19 +729,47 @@ public class OrderService {
 
         LocalDate today = LocalDate.now();
         if (departureDate.getDepartDate().isBefore(today)) {
-            expireOverdueTravelOrder(order);
+            completeFinishedTravelOrder(order);
             return;
         }
 
+        if (ORDER_STATUS_COMPLETED.equals(order.getOrderStatus())) {
+            order.setOrderStatus(ORDER_STATUS_PENDING_TRAVEL);
+            tourOrderMapper.updateById(order);
+        }
     }
 
-    private void expireOverdueTravelOrder(TourOrder order) {
+    private void completeFinishedTravelOrder(TourOrder order) {
         if (order == null || order.getId() == null) {
             return;
         }
-        order.setOrderStatus(ORDER_STATUS_EXPIRED);
+        if (ORDER_STATUS_COMPLETED.equals(order.getOrderStatus())) {
+            return;
+        }
+        order.setOrderStatus(ORDER_STATUS_COMPLETED);
         tourOrderMapper.updateById(order);
-        log.info("expired overdue travel order, orderId={}, orderNo={}", order.getId(), order.getOrderNo());
+        log.info("completed finished travel order, orderId={}, orderNo={}", order.getId(), order.getOrderNo());
+    }
+
+    private boolean isRefundOrderStatus(TourOrder order) {
+        if (order == null) {
+            return false;
+        }
+        return "REFUNDING".equals(order.getOrderStatus())
+                || "REFUNDED".equals(order.getOrderStatus())
+                || "REFUNDED".equals(order.getPayStatus());
+    }
+
+    private boolean isPaidFinishedTravelOrder(TourOrder order) {
+        if (order == null || !PAY_STATUS_PAID.equals(order.getPayStatus()) || isRefundOrderStatus(order)) {
+            return false;
+        }
+        TourDepartureDate departureDate = order.getDepartDateId() == null
+                ? null
+                : tourDepartureDateMapper.selectById(order.getDepartDateId());
+        return departureDate != null
+                && departureDate.getDepartDate() != null
+                && departureDate.getDepartDate().isBefore(LocalDate.now());
     }
 
     private void reconcileExpiredPaymentOrder(TourOrder order) {
@@ -1040,7 +1068,27 @@ public class OrderService {
     }
 
     public void complete(Long id) {
-        throw new UnsupportedOperationException("Unimplemented method 'complete'");
+        TourOrder order = tourOrderMapper.selectById(id);
+        if (order == null || !Objects.equals(order.getUserId(), currentUserId())) {
+            throw new BizException(404, "order not found");
+        }
+        refreshOrderPaymentState(order);
+        if (!PAY_STATUS_PAID.equals(order.getPayStatus())) {
+            throw new BizException(400, "订单支付完成后才能确认完成");
+        }
+        if (ORDER_STATUS_COMPLETED.equals(order.getOrderStatus())) {
+            return;
+        }
+        if (!ORDER_STATUS_PENDING_TRAVEL.equals(order.getOrderStatus())
+                && !ORDER_STATUS_EXPIRED.equals(order.getOrderStatus())
+                && !ORDER_STATUS_CANCELLED.equals(order.getOrderStatus())) {
+            throw new BizException(400, "当前订单状态不能确认完成");
+        }
+
+        if (!isPaidFinishedTravelOrder(order)) {
+            throw new BizException(400, "出行结束后才能确认完成并评价");
+        }
+        completeFinishedTravelOrder(order);
     }
 
     public void review(Long id, OrderReviewRequest request) {
@@ -1049,8 +1097,11 @@ public class OrderService {
             throw new BizException(404, "order not found");
         }
         refreshOrderPaymentState(order);
+        if (!ORDER_STATUS_COMPLETED.equals(order.getOrderStatus()) && !isPaidFinishedTravelOrder(order)) {
+            throw new BizException(400, "只有已支付且已出行完成的订单才能评价");
+        }
         if (!ORDER_STATUS_COMPLETED.equals(order.getOrderStatus())) {
-            throw new BizException(400, "order is not completed");
+            completeFinishedTravelOrder(order);
         }
         TourReview existingReview = tourReviewMapper.selectOne(new LambdaQueryWrapper<TourReview>()
                 .eq(TourReview::getOrderId, id)

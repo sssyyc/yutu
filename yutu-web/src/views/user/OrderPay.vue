@@ -261,7 +261,7 @@ const statusTone = computed(() => ({
 }))
 
 const heroTitle = computed(() => {
-  if (isPaid.value) return "支付完成，订单已经确认"
+  if (isPaid.value) return "支付完成，订单待出行"
   if (overdueCancelled.value) return "订单已因超时未支付自动取消"
   if (shouldSyncExpiredPayment.value) return "支付时限已到，系统正在确认最终支付结果"
   return `请在 ${paymentTimeoutMinutes.value} 分钟内完成支付`
@@ -286,7 +286,7 @@ const syncHint = computed(() => {
 
 const paymentDeadlineText = computed(() => formatPaymentDeadlineTime(order.value))
 const paymentCountdownText = computed(() => {
-  if (isPaid.value) return "已完成"
+  if (isPaid.value) return "已支付"
   if (overdueCancelled.value) return "已超时"
   if (shouldSyncExpiredPayment.value) return "系统处理中"
   if (!isPendingPayment.value) return "-"
@@ -434,7 +434,7 @@ async function checkStatus(options = {}) {
     if (paymentStatus.value?.paid || order.value.payStatus === "PAID") {
       stopPolling()
       startSuccessRedirect()
-      ElMessage.success("支付成功，订单已完成")
+      ElMessage.success("支付成功，订单已进入待出行")
       return
     }
 

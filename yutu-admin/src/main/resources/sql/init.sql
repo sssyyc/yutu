@@ -480,7 +480,7 @@ CREATE TABLE `tour_route` (
   `category_id` bigint NOT NULL,
   `route_name` varchar(100) NOT NULL,
   `cover_image` varchar(255) DEFAULT NULL,
-  `summary` varchar(255) DEFAULT NULL,
+  `summary` text DEFAULT NULL,
   `detail_content` text,
   `price` decimal(10,2) NOT NULL DEFAULT '0.00',
   `stock` int NOT NULL DEFAULT '0',
@@ -604,5 +604,4 @@ UNLOCK TABLES;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
-
 
