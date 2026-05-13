@@ -511,9 +511,14 @@ onMounted(async () => {
 }
 
 .route-summary {
-  min-height: 52px;
+  min-height: 48px;
   line-height: 1.6;
   color: var(--user-muted, #6d7b88);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .route-footer {

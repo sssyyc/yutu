@@ -23,6 +23,8 @@ public class MerchantRouteSaveRequest {
 
     private Long supplementTemplateId;
 
+    private String notes;
+
     @NotBlank(message = "路线名称不能为空")
     private String routeName;
 

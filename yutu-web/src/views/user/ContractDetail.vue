@@ -25,15 +25,83 @@
     </section>
 
     <section v-if="data.contract" class="detail-grid">
-      <article class="content-card">
+      <article class="signature-card">
         <div class="section-head">
-          <h3>合同正文</h3>
-          <span>标准合同模板 + 线路补充条款</span>
+          <h3>电子签名</h3>
+          <span>{{ signatureSectionCaption }}</span>
         </div>
-        <div class="contract-content">
-          <p v-for="(paragraph, index) in contractParagraphs" :key="`${index}-${paragraph}`">
-            {{ paragraph }}
-          </p>
+
+        <div class="progress-strip">
+          <div class="progress-copy">
+            <strong>{{ signStatusText }}</strong>
+            <p>{{ progressHint }}</p>
+          </div>
+          <div class="progress-count">{{ signedCount }}/{{ requiredSignCount || 0 }}</div>
+        </div>
+
+        <div v-if="travelers.length" class="traveler-status-list">
+          <div
+            v-for="(traveler, index) in travelers"
+            :key="traveler.id || index"
+            class="traveler-status-item"
+            :class="{ done: isTravelerSigned(traveler.id) }"
+          >
+            <div class="traveler-status-main">
+              <strong>{{ travelerOptionLabel(traveler, index) }}</strong>
+              <p>{{ travelerStatusMeta(traveler) }}</p>
+            </div>
+            <div class="traveler-status-side">
+              <el-tag :type="isTravelerSigned(traveler.id) ? 'success' : 'warning'" effect="light">
+                {{ isTravelerSigned(traveler.id) ? "已签署" : "待签署" }}
+              </el-tag>
+              <span v-if="travelerSignatureTime(traveler.id)">
+                {{ formatDateTime(travelerSignatureTime(traveler.id)) }}
+              </span>
+            </div>
+          </div>
+        </div>
+        <el-empty v-else description="当前订单暂无出行人信息，暂时无法签署合同" />
+
+        <div v-if="canSign" class="signature-callout">
+          <div>
+            <strong>请先查看并确认合同内容</strong>
+            <p>确认合同正文和补充附件后，再点击电子签名书写并提交。</p>
+          </div>
+          <div class="signature-callout-actions">
+            <el-button type="primary" plain @click="openContractReview">查看合同内容</el-button>
+            <el-button type="primary" @click="openSignatureDialog">电子签名</el-button>
+          </div>
+        </div>
+
+        <div v-else-if="allSigned" class="signed-complete">
+          <div class="signed-complete-head">
+            <strong>全部出行人已完成电子签名</strong>
+            <el-button type="primary" plain size="default" @click="openContractReview">查看合同内容</el-button>
+          </div>
+          <p>合同确认已经完成，当前可以下载留存，若订单待支付可继续前往支付。</p>
+
+          <div v-if="signatures.length" class="record-section">
+            <div class="section-subhead">
+              <h4>签署记录</h4>
+              <span>{{ signatures.length }} 份</span>
+            </div>
+            <div class="record-grid">
+              <article v-for="(item, index) in signatures" :key="item.id || index" class="record-card">
+                <div class="record-head">
+                  <strong>{{ item.signerName || `签署人 ${index + 1}` }}</strong>
+                  <span>{{ item.signTime ? formatDateTime(item.signTime) : "已签署" }}</span>
+                </div>
+                <div class="record-preview">
+                  <img
+                    v-if="item.signatureImage"
+                    :src="item.signatureImage"
+                    :alt="`${item.signerName || '签署人'}电子签名`"
+                  />
+                  <div v-else class="record-fallback">{{ item.signerName || "电子签名" }}</div>
+                </div>
+              </article>
+            </div>
+          </div>
         </div>
       </article>
 
@@ -65,91 +133,16 @@
       </aside>
     </section>
 
-    <section class="page-card appendix-card">
+    <section v-if="!allSigned && data.appendices?.length" class="page-card appendix-card">
       <div class="section-head">
         <h3>补充附件</h3>
         <span>{{ (data.appendices || []).length }} 项</span>
       </div>
-      <div v-if="data.appendices?.length" class="appendix-list">
+      <div class="appendix-list">
         <article v-for="item in data.appendices" :key="item.id" class="appendix-item">
           <h4>{{ item.appendixTitle }}</h4>
           <p>{{ item.appendixContent || "暂无补充内容" }}</p>
         </article>
-      </div>
-      <el-empty v-else description="当前合同暂无补充附件" />
-    </section>
-
-    <section class="page-card signature-card">
-      <div class="section-head">
-        <h3>电子签名</h3>
-        <span>{{ signatureSectionCaption }}</span>
-      </div>
-
-      <div class="progress-strip">
-        <div class="progress-copy">
-          <strong>{{ signStatusText }}</strong>
-          <p>{{ progressHint }}</p>
-        </div>
-        <div class="progress-count">{{ signedCount }}/{{ requiredSignCount || 0 }}</div>
-      </div>
-
-      <div v-if="travelers.length" class="traveler-status-list">
-        <div
-          v-for="(traveler, index) in travelers"
-          :key="traveler.id || index"
-          class="traveler-status-item"
-          :class="{ done: isTravelerSigned(traveler.id) }"
-        >
-          <div class="traveler-status-main">
-            <strong>{{ travelerOptionLabel(traveler, index) }}</strong>
-            <p>{{ travelerStatusMeta(traveler) }}</p>
-          </div>
-          <div class="traveler-status-side">
-            <el-tag :type="isTravelerSigned(traveler.id) ? 'success' : 'warning'" effect="light">
-              {{ isTravelerSigned(traveler.id) ? "已签署" : "待签署" }}
-            </el-tag>
-            <span v-if="travelerSignatureTime(traveler.id)">
-              {{ formatDateTime(travelerSignatureTime(traveler.id)) }}
-            </span>
-          </div>
-        </div>
-      </div>
-      <el-empty v-else description="当前订单暂无出行人信息，暂时无法签署合同" />
-
-      <div v-if="canSign" class="signature-callout">
-        <div>
-          <strong>请先从上方查看完整合同正文</strong>
-          <p>确认合同正文、线路信息和补充附件后，再点击电子签名书写并提交。</p>
-        </div>
-        <el-button type="primary" @click="openSignatureDialog">电子签名</el-button>
-      </div>
-
-      <div v-else-if="allSigned" class="signed-complete">
-        <strong>全部出行人已完成电子签名</strong>
-        <p>合同确认已经完成，当前可以下载留存，若订单待支付可继续前往支付。</p>
-      </div>
-
-      <div v-if="signatures.length" class="record-section">
-        <div class="section-subhead">
-          <h4>签署记录</h4>
-          <span>{{ signatures.length }} 份</span>
-        </div>
-        <div class="record-grid">
-          <article v-for="(item, index) in signatures" :key="item.id || index" class="record-card">
-            <div class="record-head">
-              <strong>{{ item.signerName || `签署人 ${index + 1}` }}</strong>
-              <span>{{ item.signTime ? formatDateTime(item.signTime) : "已签署" }}</span>
-            </div>
-            <div class="record-preview">
-              <img
-                v-if="item.signatureImage"
-                :src="item.signatureImage"
-                :alt="`${item.signerName || '签署人'}电子签名`"
-              />
-              <div v-else class="record-fallback">{{ item.signerName || "电子签名" }}</div>
-            </div>
-          </article>
-        </div>
       </div>
     </section>
 
@@ -210,6 +203,42 @@
         </div>
       </template>
     </el-dialog>
+
+    <el-dialog
+      v-model="contractReviewVisible"
+      title="合同内容确认"
+      width="820px"
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
+      class="contract-review-dialog"
+      destroy-on-close
+    >
+      <div
+        ref="contractReviewRef"
+        class="contract-review-body"
+        @scroll="onContractScroll"
+      >
+        <p v-for="(paragraph, index) in contractParagraphs" :key="index">
+          {{ paragraph }}
+        </p>
+      </div>
+
+      <div class="contract-review-check">
+        <el-checkbox v-model="contractAgreed">
+          我已仔细阅读合同内容
+        </el-checkbox>
+      </div>
+
+      <template #footer>
+        <el-button
+          type="primary"
+          :disabled="!canConfirmContractReview"
+          @click="confirmContractReview"
+        >
+          确认
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -232,6 +261,11 @@ let context2d = null;
 const signForm = reactive({
   travelerId: null
 });
+
+const contractReviewVisible = ref(false);
+const contractReviewRef = ref(null);
+const contractScrolledToBottom = ref(false);
+const contractAgreed = ref(false);
 
 const travelers = computed(() => sanitizeTravelers(data.value.travelers));
 const signatures = computed(() => (
@@ -300,6 +334,7 @@ const pendingSignCount = computed(() => (
 const allSigned = computed(() => (
   Boolean(data.value.allSigned) || (requiredSignCount.value > 0 && pendingSignCount.value === 0)
 ));
+const canConfirmContractReview = computed(() => contractScrolledToBottom.value && contractAgreed.value);
 const canSign = computed(() => requiredSignCount.value > 0 && pendingTravelers.value.length > 0);
 const canPay = computed(() => allSigned.value && Boolean(data.value.contract?.orderId));
 const currentTraveler = computed(() => (
@@ -388,6 +423,9 @@ async function load() {
     signatureDialogVisible.value = false;
     resetCanvasState();
   }
+  if (data.value.contract?.contractContent && !allSigned.value) {
+    openContractReview();
+  }
 }
 
 function syncSelectedTraveler() {
@@ -396,6 +434,29 @@ function syncSelectedTraveler() {
     return;
   }
   signForm.travelerId = pendingTravelers.value[0]?.id ?? null;
+}
+
+function onContractScroll() {
+  const el = contractReviewRef.value;
+  if (!el) return;
+  const threshold = 5;
+  if (el.scrollTop + el.clientHeight >= el.scrollHeight - threshold) {
+    contractScrolledToBottom.value = true;
+  }
+}
+
+function openContractReview() {
+  contractScrolledToBottom.value = false;
+  contractAgreed.value = false;
+  contractReviewVisible.value = true;
+}
+
+function confirmContractReview() {
+  if (!contractAgreed.value) {
+    ElMessage.warning("请先勾选'我已仔细阅读合同内容'");
+    return;
+  }
+  contractReviewVisible.value = false;
 }
 
 function initCanvas() {
@@ -694,7 +755,6 @@ onMounted(load);
   gap: 20px;
 }
 
-.content-card,
 .summary-card,
 .appendix-card,
 .signature-card {
@@ -760,6 +820,68 @@ onMounted(load);
 
 .contract-content p:last-child {
   margin-bottom: 0;
+}
+
+.contract-preview {
+  padding: 28px 20px;
+  border-radius: 18px;
+  background: #f7f9fc;
+  border: 1px solid #e8eef7;
+  text-align: center;
+}
+
+.contract-preview p {
+  margin: 0 0 18px;
+  color: #607089;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.contract-review-body {
+  max-height: 55vh;
+  overflow-y: auto;
+  padding: 22px 24px;
+  border-radius: 18px;
+  background: #f7f9fc;
+  border: 1px solid #e8eef7;
+}
+
+.contract-review-body p {
+  margin: 0 0 14px;
+  line-height: 2;
+  color: #2a3f5d;
+  font-size: 15px;
+  white-space: pre-line;
+}
+
+.contract-review-body p:last-child {
+  margin-bottom: 0;
+}
+
+.contract-review-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.contract-review-body::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 3px;
+}
+
+.contract-review-body::-webkit-scrollbar-thumb {
+  background: #c8d4e4;
+  border-radius: 3px;
+}
+
+.contract-review-body::-webkit-scrollbar-thumb:hover {
+  background: #9aadc5;
+}
+
+.contract-review-check {
+  margin-top: 18px;
+  padding: 16px 20px;
+  border-radius: 14px;
+  background: #f8fbff;
+  border: 1px solid #e2eaf5;
 }
 
 .summary-card {
@@ -918,6 +1040,40 @@ onMounted(load);
   line-height: 1.7;
 }
 
+.signature-callout-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.signed-complete {
+  padding: 18px 20px;
+  margin-top: 16px;
+  border-radius: 18px;
+  background: #f4fbf5;
+  border: 1px solid #d6ead9;
+}
+
+.signed-complete-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.signed-complete-head strong {
+  color: #206836;
+  font-size: 18px;
+}
+
+.signed-complete p {
+  margin: 8px 0 0;
+  color: #5c6c84;
+  line-height: 1.7;
+}
+
 .signer-form-row {
   display: grid;
   grid-template-columns: minmax(0, 360px) minmax(220px, 1fr);
@@ -982,26 +1138,6 @@ onMounted(load);
   gap: 12px;
   justify-content: flex-end;
   margin-top: 16px;
-}
-
-.signed-complete {
-  padding: 18px 20px;
-  margin-top: 16px;
-  border-radius: 18px;
-  background: #f4fbf5;
-  border: 1px solid #d6ead9;
-}
-
-.signed-complete strong {
-  display: block;
-  color: #206836;
-  font-size: 18px;
-}
-
-.signed-complete p {
-  margin: 8px 0 0;
-  color: #5c6c84;
-  line-height: 1.7;
 }
 
 .record-section {
@@ -1078,7 +1214,6 @@ onMounted(load);
   }
 
   .hero-card,
-  .content-card,
   .summary-card,
   .appendix-card,
   .signature-card {

@@ -65,6 +65,16 @@
 
           <h1 class="route-title">{{ routeInfo.routeName || "路线详情" }}</h1>
           <p class="route-summary">{{ routeInfo.summary || "暂无路线简介" }}</p>
+
+          <button
+            type="button"
+            class="favorite-btn"
+            :class="{ active: isFavorited }"
+            :title="isFavorited ? '取消收藏' : '收藏路线'"
+            @click.stop="toggleFavorite"
+          >
+            <el-icon :size="28"><StarFilled /></el-icon>
+          </button>
         </div>
 
         <div v-if="routeTags.length" class="tag-row">
@@ -138,28 +148,77 @@
 
     <section ref="detailSectionRef" class="page-card detail-card">
       <div class="section-head">
-        <div>
-          <p class="section-kicker">DETAILS</p>
-          <h3 class="section-title">路线详情</h3>
+        <div class="section-head-left">
+          <div class="section-icon-wrap">
+            <el-icon :size="22"><MapLocation /></el-icon>
+          </div>
+          <div>
+            <p class="section-kicker">DETAILS</p>
+            <h3 class="section-title">路线详情</h3>
+          </div>
+        </div>
+        <div v-if="scheduleList.length" class="section-head-badge">
+          <el-icon :size="14"><Clock /></el-icon>
+          <span>{{ scheduleList.length }} 天行程</span>
         </div>
       </div>
 
       <div class="detail-copy">
-        {{ detailText || "暂无详细介绍" }}
+        <div class="detail-label">
+          <el-icon :size="16"><Reading /></el-icon>
+          路线介绍
+        </div>
+        <p>{{ detailText || "暂无详细介绍" }}</p>
       </div>
 
-      <div v-if="scheduleList.length" class="schedule-list">
-        <article
-          v-for="item in scheduleList"
-          :key="item.id"
-          class="schedule-card"
-        >
-          <div class="schedule-day">DAY {{ item.dayNo || "-" }}</div>
-          <div class="schedule-body">
-            <h4>{{ item.title || `第${item.dayNo || "-"}天行程` }}</h4>
-            <p>{{ item.content || "暂无详细行程说明" }}</p>
+      <div v-if="scheduleList.length" class="schedule-section">
+        <div class="schedule-section-head">
+          <div class="schedule-section-icon">
+            <el-icon :size="18"><List /></el-icon>
           </div>
-        </article>
+          <h4>行程安排</h4>
+        </div>
+
+        <div class="schedule-timeline">
+          <div class="timeline-track"></div>
+          <article
+            v-for="(item, index) in scheduleList"
+            :key="item.id"
+            class="schedule-card"
+          >
+            <div class="timeline-dot" :class="`dot-${index % 4}`"></div>
+            <div class="schedule-day" :class="`day-${index % 4}`">
+              <span class="day-label">DAY</span>
+              <span class="day-num">{{ item.dayNo || "-" }}</span>
+            </div>
+            <div class="schedule-body">
+              <h4>{{ item.title || `第${item.dayNo || "-"}天行程` }}</h4>
+              <p>{{ item.content || "暂无详细行程说明" }}</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section v-if="routeInfo.notes" class="page-card detail-card">
+      <div class="section-head">
+        <div class="section-head-left">
+          <div class="section-icon-wrap notes-icon-wrap">
+            <el-icon :size="22"><InfoFilled /></el-icon>
+          </div>
+          <div>
+            <p class="section-kicker">NOTES</p>
+            <h3 class="section-title">注意事项</h3>
+          </div>
+        </div>
+      </div>
+
+      <div class="detail-copy notes-copy">
+        <div class="detail-label">
+          <el-icon :size="16"><WarningFilled /></el-icon>
+          须知与提示
+        </div>
+        <p>{{ routeInfo.notes }}</p>
       </div>
     </section>
 
@@ -309,6 +368,7 @@
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
+import { StarFilled, MapLocation, Clock, Reading, List, InfoFilled, WarningFilled } from "@element-plus/icons-vue";
 import { api } from "../../api";
 import { useAuthStore } from "../../stores/auth";
 import { filterUpcomingDepartures, getDaysUntilDeparture } from "../../utils/departureDate";
@@ -332,6 +392,8 @@ const activeGalleryImage = ref("");
 const travelerTableRef = ref(null);
 const detailSectionRef = ref(null);
 const reviewsSectionRef = ref(null);
+const favorites = ref([]);
+const favoriting = ref(false);
 
 const routeInfo = computed(() => detail.value?.route || {});
 const routeCategoryName = computed(() => detail.value?.category?.categoryName || "未分类");
@@ -417,6 +479,40 @@ const positiveReviewRateText = computed(() => {
   return `${Math.round((positiveCount / reviewList.value.length) * 100)}%`;
 });
 
+const isFavorited = computed(() => {
+  const routeId = Number(route.params.id);
+  return favorites.value.some((fav) => Number(fav.targetId) === routeId);
+});
+
+const currentFavoriteId = computed(() => {
+  const routeId = Number(route.params.id);
+  const fav = favorites.value.find((fav) => Number(fav.targetId) === routeId);
+  return fav?.id ?? null;
+});
+
+async function toggleFavorite() {
+  if (favoriting.value) return;
+  favoriting.value = true;
+  try {
+    if (isFavorited.value) {
+      await api.del(`/favorites/${currentFavoriteId.value}`);
+      favorites.value = favorites.value.filter((fav) => fav.id !== currentFavoriteId.value);
+      ElMessage.success("已取消收藏");
+    } else {
+      const result = await api.post("/favorites", {
+        targetId: Number(route.params.id),
+        targetType: "ROUTE"
+      });
+      favorites.value.push({ id: result, targetId: Number(route.params.id), targetType: "ROUTE" });
+      ElMessage.success("已收藏");
+    }
+  } catch (err) {
+    ElMessage.warning(err?.message || "操作失败");
+  } finally {
+    favoriting.value = false;
+  }
+}
+
 const bookingTip = computed(() => {
   if (!canCreateOrder.value) {
     return "当前账号暂无下单权限，请切换可预订账号下单。";
@@ -492,11 +588,20 @@ function syncSelectedDate() {
   selectedDateId.value = defaultDate?.id ?? null;
 }
 
+async function loadFavorites() {
+  try {
+    favorites.value = await api.get("/favorites") || [];
+  } catch {
+    favorites.value = [];
+  }
+}
+
 async function load() {
   const id = route.params.id;
   const [detailResp, dateResp] = await Promise.all([
     api.get(`/routes/${id}`),
-    api.get(`/routes/${id}/dates`)
+    api.get(`/routes/${id}/dates`),
+    loadFavorites()
   ]);
   detail.value = detailResp || {};
   dates.value = filterUpcomingDepartures(dateResp);
@@ -843,9 +948,42 @@ onMounted(load);
 }
 
 .info-header {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.favorite-btn {
+  position: absolute;
+  top: -4px;
+  right: 0;
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  color: #cbd5e1;
+  transition: transform 0.22s ease, color 0.22s ease, background 0.22s ease;
+}
+
+.favorite-btn:hover {
+  color: #facc15;
+  background: rgba(250, 204, 21, 0.08);
+  transform: scale(1.12);
+}
+
+.favorite-btn.active {
+  color: #f59e0b;
+}
+
+.favorite-btn.active:hover {
+  color: #e69809;
+  background: rgba(245, 158, 11, 0.08);
 }
 
 .panel-topline {
@@ -1058,19 +1196,51 @@ onMounted(load);
 
 .detail-card,
 .review-card {
+  padding: 28px 30px;
   border: 1px solid #e4ebf4;
 }
 
 .section-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 18px;
 }
 
+.section-head-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.section-icon-wrap {
+  width: 46px;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+  color: #2563eb;
+  flex-shrink: 0;
+}
+
+.section-head-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
 .section-kicker {
-  margin: 0 0 8px;
+  margin: 0 0 4px;
   color: #94a3b8;
   font-size: 12px;
   letter-spacing: 0.16em;
@@ -1085,56 +1255,162 @@ onMounted(load);
 }
 
 .detail-copy {
-  padding: 20px 22px;
+  padding: 22px 24px;
   border-radius: 22px;
-  background: linear-gradient(180deg, #fbfdff 0%, #f7fafc 100%);
+  background: linear-gradient(135deg, #f8fafc 0%, #fbfdff 50%, #f8fafc 100%);
   border: 1px solid #e2e8f0;
+  border-left: 4px solid #2563eb;
+}
+
+.detail-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+  color: #2563eb;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.detail-copy p {
+  margin: 0;
   color: #334155;
   font-size: 16px;
   line-height: 1.9;
   white-space: pre-wrap;
 }
 
-.schedule-list {
-  display: grid;
-  gap: 14px;
-  margin-top: 18px;
+.detail-copy p:first-of-type {
+  margin-top: 0;
 }
 
-.schedule-card {
-  display: grid;
-  grid-template-columns: 104px minmax(0, 1fr);
-  gap: 16px;
-  padding: 18px;
-  border-radius: 22px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+/* --- schedule section --- */
+.schedule-section {
+  margin-top: 24px;
 }
 
-.schedule-day {
+.schedule-section-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.schedule-section-icon {
+  width: 34px;
+  height: 34px;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 92px;
-  border-radius: 18px;
-  background: linear-gradient(135deg, #0f766e 0%, #1d4ed8 100%);
+  border-radius: 10px;
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.schedule-section-head h4 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 20px;
+}
+
+.schedule-timeline {
+  position: relative;
+  display: grid;
+  gap: 0;
+  padding-left: 20px;
+}
+
+.timeline-track {
+  position: absolute;
+  left: 7px;
+  top: 16px;
+  bottom: 16px;
+  width: 2px;
+  background: linear-gradient(180deg, #e2e8f0, #cbd5e1 30%, #cbd5e1 70%, #e2e8f0);
+  border-radius: 1px;
+}
+
+.schedule-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr);
+  gap: 16px;
+  padding: 18px 18px 18px 0;
+  transition: transform 0.2s ease;
+}
+
+.timeline-dot {
+  position: absolute;
+  left: -24px;
+  top: 28px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 3px solid #94a3b8;
+  z-index: 1;
+}
+
+.dot-0 { border-color: #3b82f6; background: #dbeafe; }
+.dot-1 { border-color: #f59e0b; background: #fef3c7; }
+.dot-2 { border-color: #22c55e; background: #dcfce7; }
+.dot-3 { border-color: #8b5cf6; background: #ede9fe; }
+
+.schedule-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 88px;
+  border-radius: 20px;
   color: #ffffff;
-  font-size: 18px;
   font-weight: 700;
+  gap: 2px;
+}
+
+.schedule-day .day-label {
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  opacity: 0.85;
+}
+
+.schedule-day .day-num {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.day-0 { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+.day-1 { background: linear-gradient(135deg, #f59e0b, #d97706); }
+.day-2 { background: linear-gradient(135deg, #22c55e, #16a34a); }
+.day-3 { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+
+.schedule-body {
+  padding: 10px 0;
 }
 
 .schedule-body h4 {
   margin: 0;
   color: #0f172a;
   font-size: 18px;
+  line-height: 1.4;
 }
 
 .schedule-body p {
   margin: 10px 0 0;
   color: #475569;
   font-size: 15px;
-  line-height: 1.8;
+  line-height: 1.9;
   white-space: pre-wrap;
+}
+
+.notes-icon-wrap {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #d97706;
+}
+
+.notes-copy {
+  border-left-color: #d97706;
 }
 
 .review-head {

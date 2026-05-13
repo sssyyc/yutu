@@ -20,6 +20,7 @@ public class TourRoute extends BaseEntity {
     private Long standardTemplateId;
     private Long routeTemplateId;
     private Long supplementTemplateId;
+    private String notes;
     private String routeName;
     private String coverImage;
     private String summary;

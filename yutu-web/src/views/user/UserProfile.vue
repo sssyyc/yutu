@@ -67,138 +67,91 @@
     </section>
 
     <section class="page-card section-card merchant-card">
-      <div class="merchant-hero">
-        <div class="merchant-hero-main">
-          <div class="merchant-eyebrow">MERCHANT QUALIFICATION</div>
-          <h3>商户资质申请</h3>
+      <div class="card-head">
+        <div>
+          <h3>商户资质</h3>
+          <p class="card-copy">{{ statusMeta.text === '未申请' ? '申请成为商户，发布和管理旅游路线' : '管理店铺信息与资质材料' }}</p>
         </div>
-
-        <div class="merchant-hero-side">
-          <div class="hero-status-row">
-            <span class="hero-status-label">当前状态</span>
-            <el-tag :type="statusMeta.type" effect="plain" size="large">{{ statusMeta.text }}</el-tag>
-          </div>
-
-          <div v-if="auth.user?.roleType === 2" class="hero-actions">
-            <el-button class="hero-action-btn" @click="$router.push('/merchant')">进入商家端</el-button>
-            <el-button class="hero-action-btn" @click="handleCancelMerchant">注销商户</el-button>
-          </div>
-        </div>
+        <el-tag :type="statusMeta.type" effect="light" round>{{ statusMeta.text }}</el-tag>
       </div>
 
-      <el-alert
-        v-if="merchant.auditRemark"
-        :title="merchant.auditRemark"
-        :type="merchant.auditStatus === 2 ? 'error' : 'success'"
-        :closable="false"
-        style="margin-bottom: 16px"
-      />
+      <div v-if="merchant.auditRemark" class="audit-remark" :class="merchant.auditStatus === 2 ? 'remark-rejected' : 'remark-passed'">
+        {{ merchant.auditRemark }}
+      </div>
 
-      <el-descriptions v-if="merchant.createTime" :column="2" border class="status-panel">
-        <el-descriptions-item label="申请时间">{{ merchant.createTime }}</el-descriptions-item>
-        <el-descriptions-item label="最近更新时间">{{ merchant.updateTime || "-" }}</el-descriptions-item>
-        <el-descriptions-item label="审核时间">{{ merchant.auditTime || "-" }}</el-descriptions-item>
-        <el-descriptions-item label="当前角色">{{ roleText }}</el-descriptions-item>
-      </el-descriptions>
+      <div v-if="auth.user?.roleType === 2" class="merchant-actions-row">
+        <el-button plain @click="$router.push('/merchant')">进入商家端</el-button>
+        <el-button plain type="danger" @click="handleCancelMerchant">注销商户</el-button>
+      </div>
 
-      <el-form :model="merchant" label-width="110px" class="form-block merchant-form">
-        <el-form-item label="店铺名称">
-          <el-input v-model="merchant.shopName" :disabled="merchantLocked" placeholder="请输入店铺名称" />
-        </el-form-item>
+      <el-form :model="merchant" label-width="100px" class="form-block merchant-form">
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="店铺名称">
+              <el-input v-model="merchant.shopName" :disabled="merchantLocked" placeholder="请输入店铺名称" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="营业执照号">
+              <el-input v-model="merchant.licenseNo" :disabled="merchantLocked" placeholder="营业执照注册号" />
+            </el-form-item>
+          </el-col>
+        </el-row>
 
-        <el-form-item label="联系人">
-          <el-input v-model="merchant.contactName" :disabled="merchantLocked" placeholder="请输入联系人姓名" />
-        </el-form-item>
-
-        <el-form-item label="联系电话">
-          <el-input v-model="merchant.contactPhone" maxlength="11" :disabled="merchantLocked" placeholder="请输入联系电话" />
-        </el-form-item>
-
-        <el-form-item label="营业执照号">
-          <el-input v-model="merchant.licenseNo" :disabled="merchantLocked" placeholder="请输入营业执照号" />
-        </el-form-item>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="联系人">
+              <el-input v-model="merchant.contactName" :disabled="merchantLocked" placeholder="联系人姓名" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="联系电话">
+              <el-input v-model="merchant.contactPhone" maxlength="11" :disabled="merchantLocked" placeholder="手机号" />
+            </el-form-item>
+          </el-col>
+        </el-row>
 
         <el-form-item label="店铺简介">
-          <el-input
-            v-model="merchant.description"
-            :disabled="merchantLocked"
-            type="textarea"
-            :rows="3"
-            placeholder="请输入店铺简介或主营路线说明"
-          />
+          <el-input v-model="merchant.description" :disabled="merchantLocked" type="textarea" :rows="3" placeholder="店铺简介或主营路线说明" />
         </el-form-item>
 
-        <el-form-item label="营业执照">
-          <div class="upload-grid">
-            <el-upload
-              :show-file-list="false"
-              accept="image/*"
-              :disabled="merchantLocked"
-              :http-request="(options) => uploadImage(options, 'licenseImage')"
-            >
-              <div class="upload-box">
-                <el-image
-                  v-if="merchant.licenseImage"
-                  :src="merchant.licenseImage"
-                  fit="cover"
-                  class="upload-image"
-                  :preview-src-list="[merchant.licenseImage]"
-                  preview-teleported
-                />
-                <div v-else class="upload-placeholder">上传营业执照</div>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="营业执照">
+              <el-upload :show-file-list="false" accept="image/*" :disabled="merchantLocked" :http-request="(options) => uploadImage(options, 'licenseImage')">
+                <div class="upload-box" :class="{ filled: merchant.licenseImage }">
+                  <el-image v-if="merchant.licenseImage" :src="merchant.licenseImage" fit="cover" class="upload-image" :preview-src-list="[merchant.licenseImage]" preview-teleported />
+                  <div v-else class="upload-placeholder"><el-icon :size="22"><Plus /></el-icon><span>{{ merchantLocked ? '未上传' : '点击上传' }}</span></div>
+                </div>
+              </el-upload>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="身份证照片">
+              <div class="upload-row">
+                <el-upload :show-file-list="false" accept="image/*" :disabled="merchantLocked" :http-request="(options) => uploadImage(options, 'idCardFrontImage')">
+                  <div class="upload-box" :class="{ filled: merchant.idCardFrontImage }">
+                    <el-image v-if="merchant.idCardFrontImage" :src="merchant.idCardFrontImage" fit="cover" class="upload-image" :preview-src-list="[merchant.idCardFrontImage]" preview-teleported />
+                    <div v-else class="upload-placeholder"><el-icon :size="22"><Plus /></el-icon><span>{{ merchantLocked ? '未上传' : '人像面' }}</span></div>
+                  </div>
+                </el-upload>
+                <el-upload :show-file-list="false" accept="image/*" :disabled="merchantLocked" :http-request="(options) => uploadImage(options, 'idCardBackImage')">
+                  <div class="upload-box" :class="{ filled: merchant.idCardBackImage }">
+                    <el-image v-if="merchant.idCardBackImage" :src="merchant.idCardBackImage" fit="cover" class="upload-image" :preview-src-list="[merchant.idCardBackImage]" preview-teleported />
+                    <div v-else class="upload-placeholder"><el-icon :size="22"><Plus /></el-icon><span>{{ merchantLocked ? '未上传' : '国徽面' }}</span></div>
+                  </div>
+                </el-upload>
               </div>
-            </el-upload>
-          </div>
-        </el-form-item>
+            </el-form-item>
+          </el-col>
+        </el-row>
 
-        <el-form-item label="身份证照片">
-          <div class="upload-grid dual">
-            <el-upload
-              :show-file-list="false"
-              accept="image/*"
-              :disabled="merchantLocked"
-              :http-request="(options) => uploadImage(options, 'idCardFrontImage')"
-            >
-              <div class="upload-box">
-                <el-image
-                  v-if="merchant.idCardFrontImage"
-                  :src="merchant.idCardFrontImage"
-                  fit="cover"
-                  class="upload-image"
-                  :preview-src-list="[merchant.idCardFrontImage]"
-                  preview-teleported
-                />
-                <div v-else class="upload-placeholder">上传身份证人像面</div>
-              </div>
-            </el-upload>
-
-            <el-upload
-              :show-file-list="false"
-              accept="image/*"
-              :disabled="merchantLocked"
-              :http-request="(options) => uploadImage(options, 'idCardBackImage')"
-            >
-              <div class="upload-box">
-                <el-image
-                  v-if="merchant.idCardBackImage"
-                  :src="merchant.idCardBackImage"
-                  fit="cover"
-                  class="upload-image"
-                  :preview-src-list="[merchant.idCardBackImage]"
-                  preview-teleported
-                />
-                <div v-else class="upload-placeholder">上传身份证国徽面</div>
-              </div>
-            </el-upload>
-          </div>
-        </el-form-item>
-
-        <el-form-item>
+        <el-form-item class="merchant-submit">
           <el-button type="primary" :disabled="merchantLocked" @click="submitMerchantApplication">
-            {{ merchant.id ? "重新提交审核" : "提交商户申请" }}
+            {{ merchant.id ? "重新提交审核" : "提交申请" }}
           </el-button>
-          <span v-if="merchant.auditStatus === 0" class="hint-text">材料提交后等待管理员审核</span>
-          <span v-if="merchant.auditStatus === 1" class="hint-text">当前账号已具备商户资质</span>
+          <span v-if="merchant.auditStatus === 0" class="hint-text">提交后等待管理员审核</span>
+          <span v-if="merchant.auditStatus === 1" class="hint-text hint-success">已具备商户资质</span>
         </el-form-item>
       </el-form>
     </section>
@@ -208,6 +161,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
+import { Plus } from "@element-plus/icons-vue";
 import { api } from "../../api";
 import { useAuthStore } from "../../stores/auth";
 import { isValidPhone } from "../../utils/phone";
@@ -255,15 +209,6 @@ const statusMeta = computed(() => {
     2: { text: "已驳回", type: "danger" }
   };
   return map[merchant.auditStatus] || map.null;
-});
-
-const roleText = computed(() => {
-  const map = {
-    1: "普通用户",
-    2: "商家",
-    3: "管理员"
-  };
-  return map[auth.user?.roleType] || "普通用户";
 });
 
 const merchantLocked = computed(() => merchant.auditStatus === 1);
@@ -551,104 +496,72 @@ async function handleCancelMerchant() {
   flex-shrink: 0;
 }
 
-.merchant-hero {
+/* ===== Merchant Section ===== */
+.merchant-card {
+  padding-bottom: 20px;
+}
+
+.audit-remark {
+  padding: 12px 16px;
+  border-radius: 10px;
+  margin-bottom: 14px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.remark-rejected {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+}
+
+.remark-passed {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+}
+
+.merchant-actions-row {
   display: flex;
-  align-items: stretch;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 20px 22px;
-  border-radius: 16px;
-  border: 1px solid #e2e8f0;
-  background: #ffffff;
-  margin-bottom: 16px;
-}
-
-.merchant-hero-main {
-  flex: 1;
-  min-width: 0;
-}
-
-.merchant-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  height: 28px;
-  padding: 0 12px;
-  border-radius: 999px;
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  color: #475569;
-  background: #f1f5f9;
-}
-
-.merchant-hero-main h3 {
-  margin: 10px 0 0;
-  color: #0f172a;
-  font-size: 26px;
-}
-
-.merchant-hero-side {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 14px;
-  min-width: 300px;
-  padding: 14px;
-  border-radius: 14px;
-  border: 1px solid #e2e8f0;
-  background: #f8fafc;
-}
-
-.hero-status-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   gap: 12px;
+  margin-bottom: 14px;
 }
 
-.hero-status-label {
-  font-size: 13px;
-  color: #64748b;
+.merchant-form {
+  width: 100%;
 }
 
-.hero-actions {
+.upload-row {
   display: flex;
   gap: 10px;
 }
 
-.hero-action-btn {
-  flex: 1;
-  min-width: 0;
-  border-radius: 10px;
-}
-
-.status-panel {
-  margin-bottom: 16px;
-}
-
-.upload-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-}
-
-.upload-grid.dual .upload-box {
-  width: 220px;
-}
-
 .upload-box {
-  width: 320px;
-  height: 180px;
-  border: 1px dashed #cfd4dc;
-  border-radius: 14px;
+  width: 100%;
+  height: 88px;
+  border: 1px dashed #d6dbe4;
+  border-radius: 10px;
   overflow: hidden;
   background: #f8fafc;
   cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.upload-box:hover {
+  border-color: #94a3b8;
+  background: #f1f5f9;
+}
+
+.upload-box.filled {
+  border-style: solid;
+  border-color: #e2e8f0;
 }
 
 .upload-image {
   width: 100%;
   height: 100%;
   display: block;
+  object-fit: cover;
 }
 
 .upload-placeholder {
@@ -656,14 +569,27 @@ async function handleCancelMerchant() {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #667085;
-  font-size: 14px;
+  gap: 6px;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.upload-placeholder .el-icon {
+  color: #cbd5e1;
+}
+
+.merchant-submit {
+  margin-top: 0;
 }
 
 .hint-text {
   margin-left: 12px;
-  color: #667085;
+  color: #64748b;
   font-size: 13px;
+}
+
+.hint-success {
+  color: #16a34a;
 }
 
 @media (max-width: 980px) {
@@ -696,25 +622,6 @@ async function handleCancelMerchant() {
 
   .profile-fields {
     max-width: 100%;
-  }
-
-  .merchant-hero {
-    flex-direction: column;
-    padding: 16px;
-  }
-
-  .merchant-hero-main h3 {
-    font-size: 24px;
-  }
-
-  .merchant-hero-side {
-    width: 100%;
-    min-width: 0;
-  }
-
-  .hero-actions {
-    width: 100%;
-    flex-direction: column;
   }
 
   .merchant-form {

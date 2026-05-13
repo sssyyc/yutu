@@ -51,17 +51,17 @@
       </div>
 
       <el-table :data="list" border class="resource-table">
-        <el-table-column prop="id" label="ID" width="90" />
-        <el-table-column prop="categoryName" label="形式名称" min-width="180" />
-        <el-table-column prop="sortNum" label="显示顺序" width="140" />
-        <el-table-column label="状态" width="150">
+        <el-table-column prop="id" label="ID" width="70" />
+        <el-table-column prop="categoryName" label="形式名称" min-width="80" />
+        <el-table-column prop="sortNum" label="显示顺序" width="180" />
+        <el-table-column label="状态" width="160">
           <template #default="{ row }">
             <el-tag :type="row.status === 1 ? 'success' : 'info'">
               {{ row.status === 1 ? "启用" : "停用" }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="220" fixed="right">
+        <el-table-column label="操作" width="250" fixed="right">
           <template #default="{ row }">
             <el-button text type="primary" @click="openEditDialog(row)">编辑</el-button>
             <el-button text type="danger" @click="remove(row.id)">删除</el-button>

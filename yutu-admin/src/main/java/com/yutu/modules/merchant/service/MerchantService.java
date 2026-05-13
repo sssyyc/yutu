@@ -103,6 +103,7 @@ public class MerchantService {
         route.setCoverImage(request.getCoverImage());
         route.setSummary(request.getSummary());
         route.setDetailContent(request.getDetailContent());
+        route.setNotes(request.getNotes());
         route.setPrice(request.getPrice());
         route.setStock(request.getStock());
         route.setScore(new BigDecimal("5.0"));
@@ -126,6 +127,7 @@ public class MerchantService {
         route.setCoverImage(request.getCoverImage());
         route.setSummary(request.getSummary());
         route.setDetailContent(request.getDetailContent());
+        route.setNotes(request.getNotes());
         route.setPrice(request.getPrice());
         route.setStock(request.getStock());
         if (routeBaseChanged) {
@@ -440,6 +442,7 @@ public class MerchantService {
                 || !Objects.equals(route.getCoverImage(), request.getCoverImage())
                 || !Objects.equals(route.getSummary(), request.getSummary())
                 || !Objects.equals(route.getDetailContent(), request.getDetailContent())
+                || !Objects.equals(route.getNotes(), request.getNotes())
                 || compareDecimal(route.getPrice(), request.getPrice()) != 0
                 || !Objects.equals(route.getStock(), request.getStock());
     }

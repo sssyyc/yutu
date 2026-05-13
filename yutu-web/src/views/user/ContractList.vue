@@ -140,20 +140,6 @@
 
         <section class="detail-card">
           <div class="section-head">
-            <h4>补充附件</h4>
-            <span>{{ appendices.length }} 项</span>
-          </div>
-          <div v-if="appendices.length" class="appendix-list">
-            <article v-for="item in appendices" :key="item.id" class="appendix-item">
-              <h4>{{ item.appendixTitle || "未命名附件" }}</h4>
-              <p>{{ item.appendixContent || "暂无附件内容" }}</p>
-            </article>
-          </div>
-          <el-empty v-else description="当前合同暂无补充附件" />
-        </section>
-
-        <section class="detail-card">
-          <div class="section-head">
             <h4>签署记录</h4>
             <span>{{ signatures.length }} 条</span>
           </div>
@@ -210,11 +196,6 @@ const travelers = computed(() => (
 const signatures = computed(() => (
   Array.isArray(detail.value.signatures) ? detail.value.signatures.filter(Boolean) : []
 ));
-
-const appendices = computed(() => (
-  Array.isArray(detail.value.appendices) ? detail.value.appendices.filter(Boolean) : []
-));
-
 const requiredSignCount = computed(() => {
   const count = Number(detail.value.requiredSignCount);
   return Number.isFinite(count) && count >= 0 ? count : travelers.value.length;
@@ -471,15 +452,13 @@ h2 {
 }
 
 .traveler-list,
-.record-list,
-.appendix-list {
+.record-list {
   display: grid;
   gap: 12px;
 }
 
 .traveler-item,
-.record-item,
-.appendix-item {
+.record-item {
   padding: 14px 16px;
   border-radius: 14px;
   background: #f9fbff;
@@ -487,24 +466,16 @@ h2 {
 }
 
 .traveler-item strong,
-.record-head strong,
-.appendix-item h4 {
+.record-head strong {
   display: block;
   color: #152847;
 }
 
 .traveler-item p,
-.record-head span,
-.appendix-item p {
+.record-head span {
   margin: 6px 0 0;
   color: #64748b;
   line-height: 1.6;
-}
-
-.appendix-item h4,
-.appendix-item p {
-  word-break: break-word;
-  white-space: pre-line;
 }
 
 .record-head {

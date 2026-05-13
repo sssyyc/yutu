@@ -42,33 +42,33 @@
       </div>
 
       <el-table :data="list" border>
-        <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column label="申请人" min-width="150">
+        <el-table-column prop="id" label="ID" width="50" />
+        <el-table-column label="申请人" min-width="120">
           <template #default="{ row }">
             <div>{{ row.applicantUsername || "-" }}</div>
           </template>
         </el-table-column>
-        <el-table-column prop="shopName" label="店铺名称" min-width="180" />
-        <el-table-column prop="contactPhone" label="联系方式" min-width="150" />
+        <el-table-column prop="shopName" label="店铺名称" min-width="160" />
+        <el-table-column prop="contactPhone" label="联系方式" min-width="130" />
         <el-table-column prop="licenseNo" label="营业执照号" min-width="190" />
-        <el-table-column label="审核状态" width="120">
+        <el-table-column label="审核状态" width="80">
           <template #default="{ row }">
             <el-tag :type="auditTag(row.auditStatus).type">{{ auditTag(row.auditStatus).text }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="经营状态" width="120">
+        <el-table-column label="经营状态" width="100">
           <template #default="{ row }">
             <el-tag :type="businessTag(row).type">{{ businessTag(row).text }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="经营概况" min-width="220">
+        <el-table-column label="经营概况" min-width="170">
           <template #default="{ row }">
             <div class="metric-line">路线 {{ row.routeCount || 0 }} 条</div>
             <div class="metric-line">订单 {{ row.orderCount || 0 }} 单</div>
             <div class="metric-line">成交 {{ currencyText(row.turnover) }}</div>
           </template>
         </el-table-column>
-        <el-table-column label="投诉数" width="100">
+        <el-table-column label="投诉数" width="80">
           <template #default="{ row }">
             <span :class="{ 'danger-text': Number(row.complaintCount || 0) > 0 }">{{ row.complaintCount || 0 }}</span>
           </template>
@@ -78,14 +78,10 @@
             {{ row.auditRemark || "-" }}
           </template>
         </el-table-column>
-        <el-table-column label="资料" width="100">
-          <template #default="{ row }">
-            <el-button text type="primary" @click="openDetail(row)">查看</el-button>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="280" fixed="right">
+        <el-table-column label="操作" width="330" fixed="right">
           <template #default="{ row }">
             <div class="table-actions">
+              <el-button text type="primary" @click="openDetail(row)">资料</el-button>
               <el-button text type="primary" @click="openRecords(row)">经营记录</el-button>
               <template v-if="row.auditStatus === 0">
                 <el-button text type="success" @click="approve(row)">通过</el-button>
@@ -575,8 +571,9 @@ onMounted(load);
 
 .table-actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
 }
 
 .image-grid {

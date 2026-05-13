@@ -1,22 +1,5 @@
 <template>
   <div class="page-card route-list-page">
-    <div class="filter-bar">
-      <div class="filter-copy">
-        <p class="eyebrow">ROUTE EXPLORE</p>
-        <h2>按形式和标签找到更合适的路线</h2>
-      </div>
-
-      <div class="filter-actions">
-        <el-input
-          v-model="query.keyword"
-          placeholder="输入路线名称、景点、目的地"
-          clearable
-          class="keyword-input"
-          @keyup.enter="handleSearch"
-        />
-        <el-button type="primary" @click="handleSearch">搜索</el-button>
-      </div>
-    </div>
 
     <div class="filter-panel">
       <div class="filter-group">
@@ -71,6 +54,18 @@
         <span>当前共找到 {{ routes.length }} 条路线</span>
         <el-button text type="primary" @click="resetFilters">清空筛选</el-button>
       </div>
+    </div>
+
+    <div class="search-bar">
+      <el-input
+        v-model="query.keyword"
+        placeholder="输入路线名称、景点、目的地"
+        clearable
+        class="keyword-input"
+        @keyup.enter="handleSearch"
+      />
+      <el-button type="primary" @click="handleSearch">搜索</el-button>
+      <el-button @click="resetFilters">重置</el-button>
     </div>
 
     <el-table v-if="routes.length" :data="routes" border class="route-table" v-loading="loading">
@@ -368,34 +363,11 @@ onMounted(async () => {
   border-radius: 24px;
 }
 
-.filter-bar {
-  display: flex;
-  justify-content: space-between;
-  gap: 18px;
-  margin-bottom: 18px;
-  padding: 18px 20px;
-  border-radius: 22px;
-  background: linear-gradient(135deg, #f6fbfa 0%, #f0fdf7 100%);
-  border: 1px solid #d8efe7;
-}
-
-.eyebrow {
-  margin: 0 0 8px;
-  color: #64748b;
-  font-size: 12px;
-  letter-spacing: 0.16em;
-}
-
-.filter-copy h2 {
-  margin: 0;
-  color: #0f172a;
-  font-size: 28px;
-}
-
-.filter-actions {
+.search-bar {
   display: flex;
   align-items: center;
   gap: 12px;
+  margin-bottom: 18px;
 }
 
 .keyword-input {
@@ -616,14 +588,11 @@ onMounted(async () => {
 }
 
 @media (max-width: 960px) {
-  .filter-bar {
-    flex-direction: column;
-  }
-
-  .filter-actions {
+  .search-bar {
     flex-direction: column;
     align-items: stretch;
   }
+
 
   .keyword-input {
     width: 100%;

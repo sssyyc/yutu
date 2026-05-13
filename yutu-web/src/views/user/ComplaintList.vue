@@ -2,19 +2,33 @@
   <div class="complaint-page">
     <section class="page-card complaint-create-card">
       <div class="section-head">
-        <div>
-          <p class="eyebrow">COMPLAINT CENTER</p>
-          <h3>发起投诉</h3>
-          <p class="section-copy">完成出行后，可以在这里选择对应路线提交投诉。</p>
+        <div class="section-head-left">
+          <div class="head-icon-wrap">
+            <el-icon :size="22"><WarningFilled /></el-icon>
+          </div>
+          <div>
+            <p class="eyebrow">COMPLAINT CENTER</p>
+            <h3>发起投诉</h3>
+          </div>
         </div>
+        <p class="section-copy">完成出行后，选择对应路线提交投诉，我们会在第一时间处理。</p>
       </div>
 
       <el-empty
         v-if="!routeOptions.length"
-        description="当前没有可投诉的已完成路线，完成出行后再来试试。"
+        description="当前没有可投诉的已完成路线"
+        :image-size="120"
       />
 
       <el-form v-else label-position="top" class="complaint-form">
+        <div class="step-indicator">
+          <span class="step active">1. 选择路线</span>
+          <span class="step-arrow">→</span>
+          <span class="step" :class="{ active: form.orderId }">2. 填写内容</span>
+          <span class="step-arrow">→</span>
+          <span class="step">3. 提交投诉</span>
+        </div>
+
         <el-form-item label="投诉路线">
           <el-select
             v-model="form.orderId"
@@ -22,6 +36,7 @@
             filterable
             clearable
             class="route-select"
+            size="large"
           >
             <el-option
               v-for="item in routeOptions"
@@ -31,17 +46,27 @@
             >
               <div class="route-option">
                 <span class="route-option-name">{{ item.routeName }}</span>
-                <span class="route-option-meta">{{ item.orderNo }}</span>
+                <el-tag size="small" effect="plain" round>{{ item.orderNo }}</el-tag>
               </div>
             </el-option>
           </el-select>
         </el-form-item>
 
         <div v-if="selectedRoute" class="selected-route">
+          <div class="selected-route-badge">
+            <el-icon :size="16"><Check /></el-icon>
+            <span>已选择</span>
+          </div>
           <div class="selected-route-name">{{ selectedRoute.routeName }}</div>
           <div class="selected-route-meta">
-            <span>订单号：{{ selectedRoute.orderNo }}</span>
-            <span>完成时间：{{ formatDateTime(selectedRoute.completedTime) }}</span>
+            <span>
+              <el-icon :size="14"><Document /></el-icon>
+              订单号：{{ selectedRoute.orderNo }}
+            </span>
+            <span>
+              <el-icon :size="14"><Clock /></el-icon>
+              完成时间：{{ formatDateTime(selectedRoute.completedTime) }}
+            </span>
           </div>
         </div>
 
@@ -50,7 +75,8 @@
             v-model="form.title"
             maxlength="128"
             show-word-limit
-            placeholder="请输入投诉标题"
+            placeholder="用一句话概括投诉问题"
+            size="large"
           />
         </el-form-item>
 
@@ -61,42 +87,89 @@
             :rows="5"
             maxlength="500"
             show-word-limit
-            placeholder="请详细描述投诉内容"
+            placeholder="请详细描述投诉内容，提供准确信息有助于尽快解决问题"
+            resize="none"
           />
         </el-form-item>
 
         <div class="form-actions">
-          <el-button type="primary" :disabled="!routeOptions.length" @click="createComplaint">提交投诉</el-button>
+          <el-button
+            type="primary"
+            size="large"
+            :disabled="!routeOptions.length"
+            :icon="Promotion"
+            @click="createComplaint"
+          >
+            提交投诉
+          </el-button>
+          <span class="form-actions-hint">提交后平台工作人员将尽快受理</span>
         </div>
       </el-form>
     </section>
 
     <section class="page-card complaint-list-card">
       <div class="section-head">
-        <div>
-          <p class="eyebrow">MY RECORDS</p>
-          <h3>我的投诉</h3>
+        <div class="section-head-left">
+          <div class="head-icon-wrap head-icon-secondary">
+            <el-icon :size="22"><List /></el-icon>
+          </div>
+          <div>
+            <p class="eyebrow">MY RECORDS</p>
+            <h3>我的投诉</h3>
+          </div>
         </div>
+        <el-tag effect="plain" round size="large">{{ list.length }} 条记录</el-tag>
       </div>
 
-      <el-table :data="list" border>
-        <el-table-column prop="complaintNo" label="投诉号" min-width="180" />
-        <el-table-column prop="routeName" label="投诉路线" min-width="220" />
-        <el-table-column prop="orderNo" label="关联订单" min-width="180" />
-        <el-table-column prop="title" label="标题" min-width="200" />
-        <el-table-column label="状态" width="140">
-          <template #default="{ row }">
-            <el-tag :type="complaintStatusMeta(row.status).type" effect="light" round>
-              {{ complaintStatusMeta(row.status).text }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="120">
-          <template #default="{ row }">
-            <el-button text type="primary" @click="$router.push(`/complaint/detail/${row.id}`)">详情</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+      <el-empty
+        v-if="!list.length"
+        description="暂无投诉记录"
+        :image-size="120"
+      />
+
+      <div v-else class="complaint-cards">
+        <article
+          v-for="item in list"
+          :key="item.id"
+          class="complaint-card"
+          :class="`card-${complaintStatusMeta(item.status).variant}`"
+          @click="$router.push(`/complaint/detail/${item.id}`)"
+        >
+          <div class="card-top">
+            <div class="card-title-row">
+              <h4>{{ item.title }}</h4>
+              <el-tag
+                :type="complaintStatusMeta(item.status).type"
+                effect="light"
+                round
+                size="large"
+              >
+                {{ complaintStatusMeta(item.status).text }}
+              </el-tag>
+            </div>
+            <p class="card-no">{{ item.complaintNo }}</p>
+          </div>
+
+          <div class="card-body">
+            <div class="card-route">
+              <el-icon :size="15"><MapLocation /></el-icon>
+              <span>{{ item.routeName || "未命名路线" }}</span>
+            </div>
+            <div class="card-order">
+              <el-icon :size="15"><Tickets /></el-icon>
+              <span>{{ item.orderNo || "-" }}</span>
+            </div>
+          </div>
+
+          <div class="card-footer">
+            <span class="card-date">{{ formatDateTime(item.createTime) }}</span>
+            <el-button text type="primary" class="card-action">
+              查看详情
+              <el-icon :size="14"><ArrowRight /></el-icon>
+            </el-button>
+          </div>
+        </article>
+      </div>
     </section>
   </div>
 </template>
@@ -104,6 +177,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
 import { ElMessage } from "element-plus";
+import { Promotion, WarningFilled, List, Check, Document, Clock, MapLocation, Tickets, ArrowRight } from "@element-plus/icons-vue";
 import { api } from "../../api";
 
 const list = ref([]);
@@ -120,14 +194,14 @@ const selectedRoute = computed(() =>
 
 function complaintStatusMeta(status) {
   const map = {
-    PENDING_ACCEPT: { text: "待受理", type: "warning" },
-    ACCEPTED: { text: "已受理", type: "primary" },
-    ASSIGNED: { text: "处理中", type: "info" },
-    REPLIED: { text: "已回复", type: "success" },
-    CLOSED: { text: "已关闭", type: "info" },
-    REJECTED: { text: "已驳回", type: "danger" }
+    PENDING_ACCEPT: { text: "待受理", type: "warning", variant: "pending" },
+    ACCEPTED: { text: "已受理", type: "primary", variant: "accepted" },
+    ASSIGNED: { text: "处理中", type: "info", variant: "processing" },
+    REPLIED: { text: "已回复", type: "success", variant: "replied" },
+    CLOSED: { text: "已关闭", type: "info", variant: "closed" },
+    REJECTED: { text: "已驳回", type: "danger", variant: "rejected" }
   };
-  return map[status] || { text: String(status || "-"), type: "info" };
+  return map[status] || { text: String(status || "-"), type: "info", variant: "default" };
 }
 
 async function load() {
@@ -135,8 +209,8 @@ async function load() {
     api.get("/complaints"),
     api.get("/complaints/route-options")
   ]);
-  list.value = complaints;
-  routeOptions.value = options;
+  list.value = complaints || [];
+  routeOptions.value = options || [];
 }
 
 function routeOptionLabel(item) {
@@ -171,7 +245,7 @@ async function createComplaint() {
 
 function formatDateTime(value) {
   if (!value) return "-";
-  return String(value).replace("T", " ").slice(0, 19);
+  return String(value).replace("T", " ").slice(0, 16);
 }
 
 onMounted(load);
@@ -180,14 +254,14 @@ onMounted(load);
 <style scoped>
 .complaint-page {
   display: grid;
-  grid-template-columns: minmax(360px, 420px) minmax(0, 1fr);
+  grid-template-columns: minmax(380px, 440px) minmax(0, 1fr);
   gap: 20px;
   align-items: start;
 }
 
 .complaint-create-card,
 .complaint-list-card {
-  padding: 24px 26px;
+  padding: 28px 30px;
   border-radius: 24px;
 }
 
@@ -200,16 +274,39 @@ onMounted(load);
   min-width: 0;
 }
 
+/* --- section head --- */
 .section-head {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 18px;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.section-head-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.head-icon-wrap {
+  width: 46px;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #d97706;
+  flex-shrink: 0;
+}
+
+.head-icon-secondary {
+  background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+  color: #2563eb;
 }
 
 .eyebrow {
-  margin: 0 0 8px;
+  margin: 0 0 4px;
   color: #94a3b8;
   font-size: 12px;
   letter-spacing: 0.14em;
@@ -222,14 +319,51 @@ onMounted(load);
 }
 
 .section-copy {
-  margin: 8px 0 0;
+  margin: 0;
   color: #64748b;
   line-height: 1.7;
+  font-size: 14px;
 }
 
+/* --- step indicator --- */
+.step-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.step {
+  font-size: 13px;
+  color: #94a3b8;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.step.active {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.step-arrow {
+  color: #cbd5e1;
+  font-size: 13px;
+  margin: 0 2px;
+}
+
+/* --- form --- */
 .complaint-form {
   display: grid;
   gap: 6px;
+}
+
+.complaint-form :deep(.el-form-item__label) {
+  color: #334155;
+  font-weight: 600;
 }
 
 .route-select {
@@ -245,41 +379,180 @@ onMounted(load);
 
 .route-option-name {
   color: #0f172a;
-}
-
-.route-option-meta {
-  color: #94a3b8;
-  font-size: 12px;
+  font-weight: 500;
 }
 
 .selected-route {
   margin-bottom: 12px;
-  padding: 14px 16px;
+  padding: 16px 18px;
   border-radius: 18px;
-  background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%);
+  background: linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%);
   border: 1px solid #dbeafe;
+}
+
+.selected-route-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #22c55e;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 10px;
 }
 
 .selected-route-name {
   color: #0f172a;
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 700;
 }
 
 .selected-route-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 8px;
+  gap: 16px;
+  margin-top: 10px;
   color: #64748b;
   font-size: 13px;
 }
 
-.form-actions {
-  display: flex;
-  justify-content: flex-start;
+.selected-route-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
+.form-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-top: 4px;
+}
+
+.form-actions-hint {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+/* --- complaint cards --- */
+.complaint-cards {
+  display: grid;
+  gap: 12px;
+}
+
+.complaint-card {
+  padding: 20px 22px;
+  border-radius: 20px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.complaint-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+  border-color: #bfdbfe;
+}
+
+.card-top {
+  margin-bottom: 14px;
+}
+
+.card-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.card-title-row h4 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 17px;
+  line-height: 1.4;
+}
+
+.card-no {
+  margin: 6px 0 0;
+  color: #94a3b8;
+  font-size: 12px;
+  font-family: "SF Mono", "JetBrains Mono", monospace;
+}
+
+.card-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #f8fafc;
+  border: 1px solid #f1f5f9;
+}
+
+.card-route,
+.card-order {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #475569;
+  font-size: 14px;
+}
+
+.card-route .el-icon {
+  color: #f59e0b;
+}
+
+.card-order .el-icon {
+  color: #64748b;
+}
+
+.card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+}
+
+.card-date {
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.card-action {
+  font-weight: 600;
+}
+
+/* --- card status variants --- */
+.card-pending {
+  border-left: 4px solid #f59e0b;
+}
+
+.card-accepted {
+  border-left: 4px solid #3b82f6;
+}
+
+.card-processing {
+  border-left: 4px solid #6366f1;
+}
+
+.card-replied {
+  border-left: 4px solid #22c55e;
+}
+
+.card-closed {
+  border-left: 4px solid #94a3b8;
+  opacity: 0.75;
+}
+
+.card-rejected {
+  border-left: 4px solid #ef4444;
+  opacity: 0.75;
+}
+
+/* --- responsive --- */
 @media (max-width: 1100px) {
   .complaint-page {
     grid-template-columns: 1fr;
@@ -287,6 +560,23 @@ onMounted(load);
 
   .complaint-create-card {
     position: static;
+  }
+}
+
+@media (max-width: 640px) {
+  .complaint-create-card,
+  .complaint-list-card {
+    padding: 20px 18px;
+  }
+
+  .card-title-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .form-actions {
+    flex-direction: column;
+    align-items: stretch;
   }
 }
 </style>

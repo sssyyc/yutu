@@ -57,7 +57,7 @@ public class AuthService {
                 .eq(SysUser::getStatus, 1)
                 .last("limit 1"));
         if (user == null) {
-            throw new BizException(400, "username or password is incorrect");
+            throw new BizException(400, "用户名或密码错误");
         }
         boolean matched;
         if (StringUtils.hasText(user.getPassword()) && user.getPassword().startsWith("$2a$")) {
@@ -70,7 +70,7 @@ public class AuthService {
             }
         }
         if (!matched) {
-            throw new BizException(400, "username or password is incorrect");
+            throw new BizException(400, "用户名或密码错误");
         }
 
         List<String> roleCodes = roleCodesByType(user.getRoleType());

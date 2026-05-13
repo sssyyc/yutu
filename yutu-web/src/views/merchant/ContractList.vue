@@ -35,31 +35,10 @@
         <el-table-column label="操作" min-width="220">
           <template #default="{ row }">
             <el-button text type="primary" @click="view(row.id)">详情</el-button>
-            <el-button text type="success" @click="openAppendix(row.id)">补充附件</el-button>
           </template>
         </el-table-column>
       </el-table>
     </section>
-
-    <el-dialog v-model="appendixDialog" title="补充附件" width="620px">
-      <el-form :model="appendix" label-width="88px">
-        <el-form-item label="附件标题">
-          <el-input v-model="appendix.appendixTitle" placeholder="请输入附件标题" />
-        </el-form-item>
-        <el-form-item label="附件内容">
-          <el-input
-            v-model="appendix.appendixContent"
-            type="textarea"
-            :rows="5"
-            placeholder="请输入附件内容"
-          />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="appendixDialog = false">取消</el-button>
-        <el-button type="primary" @click="submitAppendix">提交</el-button>
-      </template>
-    </el-dialog>
 
     <el-dialog v-model="detailDialog" title="合同详情" width="980px">
       <div v-if="detail.contract" class="contract-detail">
@@ -87,17 +66,6 @@
           <div class="section-title">合同正文</div>
           <article class="contract-content">{{ detail.contract.contractContent || "暂无合同正文" }}</article>
         </section>
-
-        <section class="detail-section">
-          <div class="section-title">补充附件</div>
-          <div v-if="detail.appendices?.length" class="appendix-list">
-            <article v-for="item in detail.appendices" :key="item.id" class="appendix-item">
-              <h4>{{ item.appendixTitle || "未命名附件" }}</h4>
-              <p>{{ item.appendixContent || "暂无附件内容" }}</p>
-            </article>
-          </div>
-          <el-empty v-else description="当前合同暂无补充附件" />
-        </section>
       </div>
       <el-empty v-else description="暂无合同详情" />
     </el-dialog>
@@ -105,8 +73,7 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from "vue";
-import { ElMessage } from "element-plus";
+import { onMounted, ref } from "vue";
 import AdminPageHero from "../../components/admin/AdminPageHero.vue";
 import { api } from "../../api";
 
@@ -114,10 +81,6 @@ const list = ref([]);
 const keyword = ref("");
 const detail = ref({});
 const detailDialog = ref(false);
-const appendixDialog = ref(false);
-const currentId = ref(null);
-const appendix = reactive({ appendixTitle: "", appendixContent: "" });
-
 async function load() {
   const trimmedKeyword = keyword.value.trim();
   const params = trimmedKeyword ? { keyword: trimmedKeyword } : undefined;
@@ -127,20 +90,6 @@ async function load() {
 async function view(id) {
   detail.value = await api.get(`/merchant/contracts/${id}`);
   detailDialog.value = true;
-}
-
-function openAppendix(id) {
-  currentId.value = id;
-  appendix.appendixTitle = "";
-  appendix.appendixContent = "";
-  appendixDialog.value = true;
-}
-
-async function submitAppendix() {
-  await api.post(`/merchant/contracts/${currentId.value}/appendix`, appendix);
-  ElMessage.success("补充附件已提交");
-  appendixDialog.value = false;
-  await load();
 }
 
 function signStatusText(status) {
@@ -276,30 +225,6 @@ onMounted(load);
   line-height: 1.8;
   white-space: pre-wrap;
   word-break: break-word;
-}
-
-.appendix-list {
-  display: grid;
-  gap: 10px;
-}
-
-.appendix-item {
-  padding: 14px 16px;
-  border-radius: 14px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-}
-
-.appendix-item h4 {
-  margin: 0 0 8px;
-  color: #0f172a;
-}
-
-.appendix-item p {
-  margin: 0;
-  color: #475569;
-  line-height: 1.7;
-  white-space: pre-wrap;
 }
 
 @media (max-width: 768px) {

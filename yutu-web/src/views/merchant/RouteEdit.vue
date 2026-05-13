@@ -109,25 +109,17 @@
                   </el-select>
                 </el-form-item>
 
+              </div>
+
+              <div class="soft-subsection">
+                <div class="section-mini-title">注意事项</div>
                 <el-form-item class="inline-form-item inline-form-item-wide">
-                  <template #label>
-                    <span>附加合同</span>
-                  </template>
-                  <el-select
-                    v-model="form.supplementTemplateId"
-                    filterable
-                    clearable
-                    placeholder="可选附加合同模板"
-                    style="width: 100%"
-                    :loading="contractTemplateLoading"
-                  >
-                    <el-option
-                      v-for="item in supplementTemplateOptions"
-                      :key="item.id"
-                      :label="item.templateName"
-                      :value="item.id"
-                    />
-                  </el-select>
+                  <el-input
+                    v-model="form.notes"
+                    type="textarea"
+                    :rows="3"
+                    placeholder="请输入该路线的注意事项，如：退改政策、携带物品、安全须知等"
+                  />
                 </el-form-item>
               </div>
 
@@ -320,12 +312,12 @@ const form = reactive({
   categoryId: null,
   standardTemplateId: null,
   routeTemplateId: null,
-  supplementTemplateId: null,
   tagIds: [],
   routeName: "",
   coverImage: "",
   summary: "",
   detailContent: "",
+  notes: "",
   price: 0,
   stock: 0
 });
@@ -402,9 +394,6 @@ function ensureTemplateSelectionValid() {
   }
   if (!templateIds.has(Number(form.routeTemplateId))) {
     form.routeTemplateId = null;
-  }
-  if (!templateIds.has(Number(form.supplementTemplateId))) {
-    form.supplementTemplateId = null;
   }
 }
 
@@ -645,7 +634,7 @@ async function loadRoute() {
   await loadContractTemplates(form.categoryId);
   form.standardTemplateId = normalizeTemplateId(found.standardTemplateId);
   form.routeTemplateId = normalizeTemplateId(found.routeTemplateId);
-  form.supplementTemplateId = normalizeTemplateId(found.supplementTemplateId);
+  form.notes = found.notes || "";
   ensureTemplateSelectionValid();
   routeLoadingTemplates.value = false;
 
@@ -670,7 +659,7 @@ async function save() {
     categoryId: Number(form.categoryId),
     standardTemplateId: normalizeTemplateId(form.standardTemplateId),
     routeTemplateId: normalizeTemplateId(form.routeTemplateId),
-    supplementTemplateId: normalizeTemplateId(form.supplementTemplateId),
+    notes: String(form.notes || "").trim(),
     tagIds: Array.isArray(form.tagIds)
       ? form.tagIds.map((item) => Number(item)).filter((id) => Number.isFinite(id) && id > 0)
       : [],
